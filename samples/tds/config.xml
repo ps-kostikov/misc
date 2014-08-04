@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<export_config>
+  <database name="backa_test_pkostikov">
+    <pool writePoolSize="0" writePoolOverflow="0" readPoolSize="6" readPoolOverflow="9"
+	  pingPeriod="30" failPingPeriod="5" nearestDC="1" timeout="0"/>
+    <read host="draco.backa.dev.yandex.net" port="5432" user="mapadmin" pass="mapadmin"/>
+    <write host="draco.backa.dev.yandex.net" port="5432" user="mapadmin" pass="mapadmin"/>
+  </database>
+
+  <dest path="./output"/>
+  <templates path="./templates"/>
+
+  <param>
+    <batch_size>10000</batch_size>
+  </param>
+</export_config>

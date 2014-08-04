@@ -1,0 +1,35 @@
+{
+  "id": 22,
+  "internal_name": "provider2",
+  "emails": [
+    {
+      "lang": "ru",
+      "value": "provider2@yandex.ru"
+    },
+    {
+      "lang": "en",
+      "value": "provider2@yandex.en"
+    }
+  ],
+  "names": [
+    {
+      "lang": "ru",
+      "value": "provider2"
+    },
+    {
+      "lang": "en",
+      "value": "provider2"
+    }
+  ],
+  "urls": [
+    {
+      "lang": "ru",
+      "value": "provider2.ru"
+    },
+    {
+      "lang": "en",
+      "value": "provider2.com"
+    }
+  ]
+
+}

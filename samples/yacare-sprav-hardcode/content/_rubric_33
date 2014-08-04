@@ -1,0 +1,55 @@
+{
+    "id": 33,
+
+    "features": [
+        {
+            "is_important": true,
+            "export_to_snippet": false,
+            "filter": false,
+            "feature": {
+                "id": 3
+            }
+        }
+    ],
+
+    "intername_name": "rubric3",
+    "mappity": 1,
+    "extended_snippet_for_company_enabled": true,
+    "publish_no_address": false,
+    "publish_no_phone": false,
+    "priority": 3,
+    "class": "hotels",
+    "apple_data": "aaa",
+    "names": [
+        {
+            "value": "rubric3",
+            "lang": "ru"
+        },
+        {
+            "value": "rubric3",
+            "lang": "en"
+        }
+    ],
+    "phrases": [
+        {
+            "value": "rubric3 phrase",
+            "lang": "ru"
+        },
+        {
+            "value": "rubric3 phrase",
+            "lang": "en"
+        }
+    ],
+    "keywords_for_companies": [
+        {
+            "value": "rubric3 keyword",
+            "lang": "ru",
+            "mappity": 1
+        },
+        {
+            "value": "rubric3 keyword",
+            "lang": "en",
+            "mappity": 2
+        }
+    ]
+}
