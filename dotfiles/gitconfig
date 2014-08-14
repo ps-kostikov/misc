@@ -1,0 +1,23 @@
+[user]
+    name = Pavel Kostikov 
+    email = pkostikov@yandex-team.ru
+
+[core]
+    autocrlf = false 
+    safecrlf = true
+    editor = vim
+
+[color]
+    diff = auto
+    status = auto
+    branch = auto
+    ui = true
+
+[alias]
+    co = checkout
+    ci = commit
+    st = status
+    br = branch
+    hist = log --pretty=format:\"%h %ad | %s%d [%an]\" --graph --date=short
+    type = cat-file -t
+    dump = cat-file -p
