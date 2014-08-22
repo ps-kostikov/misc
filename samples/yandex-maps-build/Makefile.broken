@@ -1,0 +1,94 @@
+package-name := libyandex-maps-pkostikov-sample
+
+PKG := $(package-name)
+SRCPKG := $(package-name)
+
+TILE_GENERATION_BUILD_DEPENDS = \
+    libyandex-maps-imageutils2-dev (>= 2.8.0-0) \
+    libyandex-maps-freeimage-dev (<=3.13.1-2) \
+    libyandex-maps-tileutils5-dev (>= 5.6.0-0) \
+    libyandex-maps-geolib3-dev \
+    libyandex-maps-log-dev \
+    libyandex-maps-pylogger-dev (>= 1.0.1-0) \
+    libboost-python1.40-dev \
+    libmagick++9-dev \
+    libyandex-maps-setup-python \
+    libyandex-maps-gdaltools-python \
+    libyandex-maps-tileutils5-python \
+    libyandex-maps-intel-ipp7
+
+PUBLICATION_BUILD_DEPENDS = \
+    libyandex-maps-analyzer-data-dev \
+    libyandex-maps-geolib3-dev \
+    libyandex-maps-xml3-dev \
+    libyandex-maps-log-dev \
+    libyandex-maps-common-dev \
+    libyandex-maps-tileutils5-dev \
+    libyandex-common-logger-dev \
+    libyandex-maps-pylogger-dev (>= 1.0.1-0) \
+    libboost-program-options-dev \
+    libboost-dev \
+    libboost-python-dev \
+    libgeos-dev (=3.2.2-3.yandex) \
+    libyandex-maps-http-dev \
+    libyandex-maps-tilerenderer4-dev \
+    libyandex-maps-renderer5-dev \
+    libmagick++9-dev \
+
+SIGNALS_BUILD_DEPENDS = \
+    libyandex-maps-analyzer-data-dev \
+    libyandex-maps-geolib3-dev \
+    libyandex-maps-log-dev \
+    libyandex-maps-common-dev \
+    libyandex-maps-tileutils5-dev \
+    libyandex-common-logger-dev \
+    libyandex-maps-pylogger-dev (>= 1.0.1-0) \
+    libboost-program-options-dev \
+    libboost-dev \
+    libboost-python-dev \
+    libgeos-dev (=3.2.2-3.yandex)
+
+$(package-name): DESC = \
+    Python modules for maps factory project
+
+BUILD_DEPENDS = \
+    $(TILE_GENERATION_BUILD_DEPENDS) \
+    $(PUBLICATION_BUILD_DEPENDS) \
+    $(SIGNALS_BUILD_DEPENDS) \
+    gdal-bin \
+    geotiff-bin \
+    conductor-utils \
+    imagemagick \
+    yandex-python-tools \
+    python-babel \
+    python-celery (>=3.0.0) \
+    python-fastcgi \
+    python-flask \
+    python-psycopg2 \
+    python-tz \
+    python-geoalchemy \
+    python-geojson (>=1.0.1) \
+    python-gdal (=1.8.0-2~yandex1)\
+    python-kombu (>=2.2.6) \
+    python-nose \
+    python-profiler \
+    python-psycopg2 \
+    python-requests \
+    python-shapely (>=1.2.18) \
+    python-sqlalchemy (>=0.7.0) \
+    python-yaml \
+    \
+    yandex-maps-python-data \
+    yandex-maps-factory-cfg (>=1.16.6-0) \
+    yandex-maps-g++-4.6 \
+    \
+    libyandex-maps-geolib3 \
+    libyandex-maps-geolib3-python (>=1.5.0-0)\
+    libyandex-maps-tileutils-python \
+    libyandex-maps-tileutils5-python \
+    libyandex-maps-data-export-python \
+    libyandex-maps-mapreduce-python (>=1.7.1) \
+    libyandex-maps-analyzer-api-python (>=1.9.2-0)
+
+
+include /usr/share/yandex/maps/build/build.mk
