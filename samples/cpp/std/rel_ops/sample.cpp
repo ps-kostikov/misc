@@ -1,7 +1,10 @@
 #include <iostream>
 #include <utility>
 
-using namespace std::rel_ops;
+using std::rel_ops::operator!=;
+using std::rel_ops::operator<=;
+using std::rel_ops::operator>;
+using std::rel_ops::operator>=;
 
 struct Foo {
     int n;
