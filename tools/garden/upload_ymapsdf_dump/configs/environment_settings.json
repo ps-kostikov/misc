@@ -1,0 +1,14 @@
+{
+    "filesystem": {
+        "persistent_path": "work",
+        "temp_path": "tmp"
+    },
+    "postgresql_servers": {
+        "central": {
+            "host": "ymaps-pgm.factory.maps.dev.yandex.net",
+            "user": "factory",
+            "password": "H5gBFzc9Y",
+            "database": "garden_unittest_pkostikov"
+        }
+    }
+}
