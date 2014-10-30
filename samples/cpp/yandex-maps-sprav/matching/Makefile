@@ -7,9 +7,12 @@ sample: SRCS = \
 sample: INCLUDES += . \
     /usr/include/pqxx \
     /usr/include/libxml2 \
+    /home/pkostikov/mapscore/sprav/libs/model/include \
+    
+    # yandex-maps-sprav-model \
 
 sample: LIBS = \
-    yandex-maps-sprav-model \
+	:/home/pkostikov/mapscore/sprav/libs/model/libyandex-maps-sprav-model.so \
     yandex-maps-sprav-algorithms-datamodel \
     yandex-maps-sprav-algorithms-similarity \
     yandex-maps-sprav-common \
