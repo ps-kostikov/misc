@@ -37,37 +37,13 @@ struct ReadSessionHolder {
 };
 
 // 30% - 70%
-// std::vector<model::Company> getCandidates(const algorithms::Company& company, model::Session& session)
-// {
-//     std::vector<model::search::Filter> filters;
-
-//     filters.push_back(model::search::CompanyPos.intersects(company.address().pos(), 10000));
-//     filters.push_back(model::search::CompanyAddress.match(company.address().formatted().value()));
-
-//     std::vector<model::ID> objectIds = session.loadCompanyIds(filters);
-//     std::vector<model::Company> result;
-//     for (auto id : objectIds) {
-//         auto company = session.loadCompany(id);
-//         result.push_back(company);
-//     }
-//     return result;
-    
-// }
-
-// около 40%
 std::vector<model::Company> getCandidates(const algorithms::Company& company, model::Session& session)
 {
     std::vector<model::search::Filter> filters;
 
     filters.push_back(model::search::CompanyPos.intersects(company.address().pos(), 10000));
-
-    for (auto& name: company.names()) {
-        if (name.type() == algorithms::Name::Type::Official && name.value().locale().language().lang == maps::LangCode::LANG_RU) {
-            filters.push_back(model::search::CompanyName.match(name.value().value()));
-            std::cout << "find" << std::endl;
-            break;
-        }
-    }
+    filters.push_back(model::search::CompanyAddress.match(company.address().formatted().value()));
+    std::cout << company.address().formatted().value() << std::endl;
 
     std::vector<model::ID> objectIds = session.loadCompanyIds(filters);
     std::vector<model::Company> result;
@@ -78,6 +54,30 @@ std::vector<model::Company> getCandidates(const algorithms::Company& company, mo
     return result;
     
 }
+
+// около 40%
+// std::vector<model::Company> getCandidates(const algorithms::Company& company, model::Session& session)
+// {
+//     std::vector<model::search::Filter> filters;
+
+//     filters.push_back(model::search::CompanyPos.intersects(company.address().pos(), 10000));
+
+//     for (auto& name: company.names()) {
+//         if (name.type() == algorithms::Name::Type::Official && name.value().locale().language().lang == maps::LangCode::LANG_RU) {
+//             filters.push_back(model::search::CompanyName.match(name.value().value()));
+//             std::cout << "find" << std::endl;
+//             break;
+//         }
+//     }
+
+//     std::vector<model::ID> objectIds = session.loadCompanyIds(filters);
+//     std::vector<model::Company> result;
+//     for (auto id : objectIds) {
+//         auto company = session.loadCompany(id);
+//         result.push_back(company);
+//     }
+//     return result;
+// }
 
 
 // std::vector<model::Company> getExperimentalCompanies(model::Session& session)
@@ -142,6 +142,10 @@ doSingleExperiment(model::Company& duplicateCompany, model::Company& originalCom
 
     result.matchInCandidates = std::find(
         candidatesIds.begin(), candidatesIds.end(), originalCompany.id()) != candidatesIds.end();
+
+    if (!result.matchInCandidates) {
+        std::cout << duplicateCompany.id() << " " << originalCompany.id() << std::endl;
+    }
 
     // std::cout << "duplicate id = " << duplicateCompany.id() << std::endl;
     // std::cout << "original id = " << originalCompany.id() << std::endl;
