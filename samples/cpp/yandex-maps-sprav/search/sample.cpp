@@ -48,7 +48,10 @@ int main()
     ReadSessionHolder holder(*connectionManager);
 
     std::vector<model::search::Filter> filters;
-    filters.push_back(model::search::CompanyUrl.equals("http://www.obrbank.ru"));
+    // http://hotellook.ru/RU/Krasnodar-12137/Via_Sacra-715967.html
+    // http://hotellook.ru/RU/Krasnodar-12137/Via_Sacra-715967.html
+    // filters.push_back(model::search::CompanyUrl.equals("http://otkrmir.ru"));
+    filters.push_back(model::search::CompanyName.lexemesMatch(u8"Запэнергопром"));
     auto ids = holder.session.loadCompanyIds(filters);
     for (auto id: ids) {
         std::cout << "id = " << id << std::endl;
