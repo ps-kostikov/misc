@@ -1,28 +1,26 @@
 #include <iostream>
 #include <map>
 #include <string>
-#include <algorithm>
+#include <vector>
 
 
-void print(const std::map<int, std::string>& m) {
-    std::for_each(m.begin(), m.end(), [](const std::pair<int, std::string>& p){
-        std::cout << p.first << ": " << p.second << std::endl;
-    });
-    std::cout << std::endl;
-}
 
 int main()
 {
     std::cout << "hello world" << std::endl;
 
-    std::map<int, std::string> m;
-    m[1] = "a";
-    m[2] = "b";
-    m[3] = "c";
+    std::map<std::string, std::vector<std::string>> m;
 
-    print(m);
+    m["A"].push_back("a");
+    m["A"].push_back("b");
+    m["A"].push_back("c");
 
-    m.erase(2);
-    print(m);
+    std::for_each(m.begin(), m.end(), [](const std::pair<std::string, std::vector<std::string>>& p){
+        std::cout << p.first << ": ";
+        for (const auto& s: p.second) {
+            std::cout << s << " ";
+        }
+        std::cout << std::endl;
+    });
     return 0;
 }
