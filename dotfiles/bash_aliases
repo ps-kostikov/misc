@@ -31,7 +31,7 @@ alias df='df -h'
 alias sl='ls'
 
 alias ipy='ipython'
-alias less='less +G'
+# alias less='less +G'
 alias cp2utf='iconv -fcp1251 -tutf-8'
 alias koi2utf='iconv -fkoi8-r -tutf-8'
 alias feh='qiv'
