@@ -113,15 +113,19 @@ int main(int argc, char* argv[])
             company1,
             company2);
         std::cout << "similarity = " << similarity << std::endl;
-        for (double recall: {0.1, 0.25, 0.5, 0.75, 0.9}) {
+        std::vector<double> values{0.1};
+        for (double v = 0.05; v <= 1.; v += 0.05) {
+            values.push_back(v);
+        }
+        for (double recall: values) {
             std::cout << "recall = " << recall
-                << " sim = " << algorithms::similarityThresholdByClusterRecall(
+                << " similarity = " << algorithms::similarityThresholdByClusterRecall(
                     company1,
                     company2, recall) << std::endl;
         }
-        for (double presision: {0.1, 0.25, 0.5, 0.75, 0.9}) {
+        for (double presision: values) {
             std::cout << "presision = " << presision
-                << " sim = " << algorithms::similarityThresholdByClusterPrecision(
+                << " similarity = " << algorithms::similarityThresholdByClusterPrecision(
                     company1,
                     company2, presision) << std::endl;
         }
