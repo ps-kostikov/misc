@@ -175,9 +175,12 @@ int main(int argc, char* argv[])
         }
 
         std::string cardId;
+        std::string partnerId;
         try {
             cardId = boost153::python::extract<std::string>(
                 card.attr("raw_origin")["partner_card_id"].attr("__str__")());
+            partnerId = boost153::python::extract<std::string>(
+                card.attr("raw_origin")["partner_id"].attr("__str__")());
         } catch (...) {
             ++brokenCount;
             continue;
@@ -221,6 +224,10 @@ int main(int argc, char* argv[])
             rightAnswersIdsList.append(ra.id());
         }
         cleanCard.attr("debug")["right_ids"] = rightAnswersIdsList;
+
+        std::string ammoId = "card_id: " + cardId + " partner_id: " + partnerId;
+        cleanCard.attr("debug")["ammo_id"] = ammoId;
+
         writer.attr("write")(cleanCard);
         if (maxExperimentsNumber && preparedCount >= *maxExperimentsNumber) {
             break;
