@@ -50,17 +50,19 @@ struct ReadSessionHolder {
     model::Session session;
 };
 
-std::map<std::string, std::vector<model::ID>>
+std::map<std::pair<std::string, std::string>, std::vector<model::ID>>
 fetchIdsMap(const std::string& filename)
 {
     std::ifstream is(filename.c_str());
     std::string idStr;
-    std::map<std::string, std::vector<model::ID>> result;
+    std::map<std::pair<std::string, std::string>, std::vector<model::ID>> result;
     while(std::getline(is, idStr)) {
         std::vector<std::string> strs;
         boost153::split(strs, idStr, boost153::is_any_of(" "));
-        auto objectId = boost153::lexical_cast<model::ID>(strs[1]);
-        result[strs[0]].push_back(objectId);
+        std::string partnerId = strs[0];
+        std::string partnerCardId = strs[1];
+        auto objectId = boost153::lexical_cast<model::ID>(strs[2]);
+        result[std::make_pair(partnerId, partnerCardId)].push_back(objectId);
     }
     return result;
 }
@@ -196,7 +198,7 @@ int main(int argc, char* argv[])
             continue;
         }
 
-        auto rightAnswersIds = partnerToObject[cardId];
+        auto rightAnswersIds = partnerToObject[std::make_pair(partnerId, cardId)];
         if (rightAnswersIds.size() == 0) {
             ++brokenCount;
             continue;
@@ -207,15 +209,17 @@ int main(int argc, char* argv[])
         }
         auto rightAnswers = holder.session.loadCompany(rightAnswersIds);
 
-        double bestRightSim = 0.;
-        for (auto ra: rightAnswers) {
-            auto sim = calcSimilarity(ra, *algCompany, holder.session);
-            bestRightSim = std::max(bestRightSim, sim);
-        }
 
-        if (similarityThreshold && bestRightSim < *similarityThreshold) {
-            ++lowSimilarityCount;
-            continue;
+        if (similarityThreshold) {
+            double bestRightSim = 0.;
+            for (auto ra: rightAnswers) {
+                auto sim = calcSimilarity(ra, *algCompany, holder.session);
+                bestRightSim = std::max(bestRightSim, sim);
+            }
+            if (bestRightSim < *similarityThreshold) {
+                ++lowSimilarityCount;
+                continue;
+            }
         }
 
         auto cleanCard = maps::mining::sprav2miningson::toMiningsonCard(*algCompany);
