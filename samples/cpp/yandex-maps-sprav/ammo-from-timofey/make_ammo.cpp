@@ -93,6 +93,22 @@ makeCardIdToObjectId(
     return result;
 }
 
+void
+adjustRubricIds(
+    const std::map<OriginalId, std::vector<ObjectId>>& originalIdToObjectId,
+    algorithms::Company& company)
+{
+    std::vector<algorithms::Rubric> rubricsToSet;
+    for (auto rubric: company.rubrics()) {
+        if (originalIdToObjectId.count(rubric.id()) == 0) {
+            continue;
+        }
+        auto spravId = originalIdToObjectId.at(rubric.id()).at(0);
+        rubricsToSet.emplace_back(spravId, rubric.classes());
+    }
+    company.setRubrics(rubricsToSet);
+}
+
 int main(int argc, char* argv[])
 {
     namespace bpo = boost153::program_options;
@@ -171,6 +187,7 @@ int main(int argc, char* argv[])
             ++brokenCount;
             continue;
         }
+        adjustRubricIds(originalIdToObjectId, *algCompany);
 
         if (cardIdToObjectId.count(cardId) == 0) {
             ++brokenCount;
