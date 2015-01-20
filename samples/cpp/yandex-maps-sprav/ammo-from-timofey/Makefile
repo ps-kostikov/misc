@@ -24,7 +24,7 @@ ALL_LIBS = \
     yandex-maps-sprav-common \
     yandex-maps-geolib3 \
     yandex-maps-localeutils \
-    yandex-maps-pgpool2 \
+    yandex-maps-pgpool3 \
     yandex-maps-log \
 
 

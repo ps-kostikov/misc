@@ -49,15 +49,12 @@ std::map<CardId, OriginalId>
 parseIdToOriginal(const std::string& filename)
 {
     std::ifstream is(filename.c_str());
-    std::string line;
     std::map<CardId, OriginalId> result;
+    CardId cardId;
+    CardId originalId;
 
-    while(std::getline(is, line)) {
-        std::vector<std::string> parts;
-        boost153::split(parts, line, boost153::is_any_of(" "));
-        auto id = boost153::lexical_cast<CardId>(parts[0]);
-        auto originalId = boost153::lexical_cast<OriginalId>(parts[1]);
-        result[id] = originalId;
+    while(is >> cardId >> originalId) {
+        result[cardId] = originalId;
     }
     return result;
 }
@@ -66,15 +63,11 @@ std::map<OriginalId, std::vector<ObjectId>>
 parseOriginalIds(const std::string& filename)
 {
     std::ifstream is(filename.c_str());
-    std::string line;
     std::map<OriginalId, std::vector<ObjectId>> result;
+    OriginalId originalId;
+    ObjectId objectId;
 
-    while(std::getline(is, line)) {
-        std::vector<std::string> parts;
-        // FIXME pkostikov: use only tabs as separator
-        boost153::split(parts, line, boost153::is_any_of(" \t"));
-        auto originalId = boost153::lexical_cast<OriginalId>(parts[0]);
-        auto objectId = boost153::lexical_cast<ObjectId>(parts[1]);
+    while (is >> originalId >> objectId) {
         result[originalId].push_back(objectId);
     }
     return result;
@@ -149,11 +142,9 @@ int main(int argc, char* argv[])
     auto cardIdToObjectId = makeCardIdToObjectId(
         cardIdToOriginalId, originalIdToObjectId);
 
-    auto connectionManager =
-        sprav::config::createConnectionManager(
-            sprav::config::config(),
-            sprav::config::ConnectionPoolProfile::Default);
-    ReadSessionHolder holder(*connectionManager);
+    auto pgPool = sprav::config::createPgPool(sprav::config::config());
+    ReadSessionHolder holder(*pgPool);
+
 
     MiningsonReader miningsonReader(miningsonFilename);
     AmmoWriter ammoWriter(outputFilename);

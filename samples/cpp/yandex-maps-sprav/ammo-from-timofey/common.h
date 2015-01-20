@@ -2,7 +2,7 @@
 
 #include <yandex/maps/sprav/model/storages/revision.h>
 
-#include <yandex/maps/pgpool2/pgpool.h>
+#include <yandex/maps/pgpool3/pgpool3.h>
 #include <boost153/optional.hpp>
 
 #include <vector>
@@ -11,13 +11,13 @@
 
 
 struct ReadSessionHolder {
-    ReadSessionHolder(maps::pgpool2::ConnectionMgr& connMgr) :
-        transaction(connMgr.readTransaction()),
+    ReadSessionHolder(maps::pgpool3::Pool& pool) :
+        transaction(maps::pgpool3::makeReadOnlyTransaction(pool.getMasterConnection())),
         storage(new maps::sprav::model::RevisionStorage(*transaction)),
         session(storage, maps::sprav::model::Session::CachingPolicy::CacheAll)
     {}
-
-    maps::pgpool2::PgTransaction transaction;
+ 
+    maps::pgpool3::TransactionHandle transaction;
     std::shared_ptr<maps::sprav::model::RevisionStorage> storage;
     maps::sprav::model::Session session;
 };
