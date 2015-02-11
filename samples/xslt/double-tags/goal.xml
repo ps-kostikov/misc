@@ -1,0 +1,28 @@
+<companies version="1.0">
+    <company>
+        <company-id>98544</company-id>
+        <seshat-export-id>98544</seshat-export-id>
+        <score>1</score>
+        <raw-score>1</raw-score>
+        <name-ru>РТОАО №3, Ростов-на-Дону</name-ru>
+        <country>Россия</country>
+        <admn-area>Ростовская область</admn-area>
+        <locality-name>город Ростов-на-Дону</locality-name>
+        <street>улица Мечникова</street>
+        <house>112</house>
+        <is-unchecked>0</is-unchecked>
+        <phone>
+            <number>+7 (863) 232-47-82</number>
+            <type>phone</type>
+            <info/>
+            <ext/>
+        </phone>
+        <phone>
+            <number>Факс +7 (863) 232-47-82</number>
+            <type>phone</type>
+            <info/>
+            <ext/>
+        </phone>
+        <id>98543</id>
+    </company>
+</companies>
