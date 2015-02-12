@@ -26,9 +26,9 @@ def patch_company_xml(company_xml):
             phone_copy_xml.append(number_xml)
             company_xml.append(phone_copy_xml)
 
-
 with writer.Writer('out.json') as outf:
     for company_xml in companies_xml:
         patch_company_xml(company_xml)
         card = partner_convertor.to_miningson(company_xml, '20150211')
+        card.debug["id"] = company_xml.xpath('company-id')[0].text
         outf.write(card)
