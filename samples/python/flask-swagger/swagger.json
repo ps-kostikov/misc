@@ -1,0 +1,44 @@
+{
+
+    "swagger": "2.0",
+    "info": {
+        "description": "This is a sample server",
+        "version": "1.0.0",
+        "title": "Sample",
+        "termsOfService": "http://helloreverb.com/terms/",
+        "contact": {
+            "email": "pkostikov@yandex-team.ru"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        }
+    },
+    "host": "hadar.backa.dev.yandex.net",
+    "basePath": "/",
+    "schemes": [
+        "http"
+    ],
+    "paths": {
+        "/handle": {
+            "get": {
+                "summary": "handle",
+                "description": "",
+                "operationId": "getHandle",
+                "consumes": [
+                    "application/json",
+                    "application/xml"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/xml"
+                ],
+                "parameters": [
+                ]
+            }
+        }
+    },
+    "definitions": {
+    }
+
+}
