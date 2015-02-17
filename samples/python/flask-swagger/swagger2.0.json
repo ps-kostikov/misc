@@ -14,7 +14,7 @@
             "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
         }
     },
-    "host": "hadar.backa.dev.yandex.net",
+    "host": "hadar.backa.dev.yandex.net:9016",
     "basePath": "/",
     "schemes": [
         "http"
