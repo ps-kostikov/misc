@@ -1,0 +1,21 @@
+{
+
+    "swaggerVersion": "1.2",
+    "apiVersion": "v0.1",
+    "apis": [
+        {
+            "path": "/",
+            "description": "description"
+        }
+    ],
+
+    "info": {
+        "title": "Title",
+        "description": "Description",
+        "termsOfServiceUrl": "http://yandex.ru",
+        "contact": "pkostikov@yandex-team.ru",
+        "license": "Apache 2.0",
+        "licenseUrl": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    }
+
+}

@@ -1,0 +1,31 @@
+{
+    "apiVersion": "0.1",
+    "swaggerVersion": "1.2",
+
+    "basePath": "/instance/v0.1",
+    "produces": [
+        "application/json"
+    ],
+
+    "apis": [
+        {
+            "path": "/handle",
+            "operations": [
+                {
+                    "method": "GET",
+                    "summary": "handle",
+                    "notes": "handle",
+                    "type": "void",
+                    "nickname": "GetSession",
+                    "authorizations": { },
+                    "parameters": [
+                    ]
+                }
+            ]
+        }
+    ],
+
+    "models": {
+    }
+}
+
