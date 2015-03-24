@@ -38,6 +38,8 @@ with open(input_filename) as csvfile:
                     "address_line": address_line
                 }
             ]
+        else:
+            continue
 
         if lon and lat:
             lonv = float(lon.replace(',', '.'))
