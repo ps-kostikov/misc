@@ -8,11 +8,13 @@ line = '[10/Jun/2015:00:00:01 +0300] vec.tiles.maps.yandex.net ::ffff:95.108.231
 
 line = '[10/Jun/2015:00:00:01 +0300] pvec.tiles.maps.yandex.net ::ffff:95.108.144.10 "GET /?l=pmap&v=1429650000&x=19139&y=10562&z=15&lang=ru_RU&scale=1 HTTP/1.1" 200 "-" "-" "-" 0.008 - 8325 "0.008" "/wiki_staticrenderer" "action=render&map=pmap_1429650000.xml&compressionLevel=5&x=19139&y=10562&z=15&scale=1" -'
 
+line = '[11/Jun/2015:00:00:46 +0300] vec-rdr07e8.maps.yandex.ru:3132 2a02:6b8:0:1610::1076 "GET /timetail?log=nginx/access.log&time=63 HTTP/1.1" 200 "-" "-" "-" 0.158 - 5125921 "0.057" "/timetail" "log=nginx/access.log&time=63" -'
+
 #[$time_local] $http_host $remote_addr "$request" $status "$http_referer" "$http_user_agent" "$http_cookie" $request_time $upstream_cache_status $bytes_sent "$upstream_response_time" "$uri" "$args" $ssl_session_id
 
 print line
 print ''
-d = re.match('\[(?P<time_local>.+)\] (?P<http_host>[\w.-]+) (?P<remote_addr>[\w\d:\.]+) "(?P<request>.*)" (?P<status>\d+) "(?P<http_referer>.*)" "(?P<http_user_agent>.*)" "(?P<http_cookie>.*)" (?P<request_time>[\d\.]+) (?P<upstream_cache_status>[\w-]+) (?P<bytes_sent>\d+) "(?P<upstream_response_time>.*)" "(?P<uri>.*)" "(?P<args>.*)" (?P<ssl_session_id>\.*)', line).groupdict()
+d = re.match('\[(?P<time_local>.+)\] (?P<http_host>[^\s]+) (?P<remote_addr>[^\s]+) "(?P<request>.*)" (?P<status>[^\s]+) "(?P<http_referer>.*)" "(?P<http_user_agent>.*)" "(?P<http_cookie>.*)" (?P<request_time>[^\s]+) (?P<upstream_cache_status>[^\s]+) (?P<bytes_sent>[^\s]+) "(?P<upstream_response_time>.*)" "(?P<uri>.*)" "(?P<args>.*)" (?P<ssl_session_id>[^\s]*)', line).groupdict()
 
 for k, v in d.iteritems():
     print k, ":", v
