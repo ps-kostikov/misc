@@ -60,7 +60,8 @@ def make_disk_filename():
         time.gmtime(time.time() + 60 * 60 * 3))
 
 tmp_filename = 'tmp.mp3'
+disk_filename = make_disk_filename()
 download(tmp_filename)
-upload(tmp_filename, make_disk_filename())
+upload(tmp_filename, disk_filename)
 os.remove(tmp_filename)
 
