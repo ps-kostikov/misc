@@ -5,9 +5,9 @@ import subprocess
 import os
 import contextlib
 import time
+import sys
 
-# timedelta = 60 * 60 * 4
-timedelta = 10
+timedelta = int(sys.argv[1])
 oauth = '88fed87d955f4c2ba82435269dbf51e1'
 
 
