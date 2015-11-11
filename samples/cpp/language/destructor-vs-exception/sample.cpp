@@ -19,8 +19,10 @@ int main()
 {
     try {
         A a;
+        std::cout << "before throw" << std::endl;
         throw "hello";
     } catch (...) {
+        std::cout << "catched" << std::endl;
         return 1;
     }
     return 0;
