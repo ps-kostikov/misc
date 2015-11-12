@@ -5,11 +5,7 @@ sample: SRCS = \
 
 
 sample: LIBS = \
-    yandex-maps-xml3 \
-
-sample: INCLUDES += \
-    /usr/include/libxml2 \
-
+    yandex-maps-http2 \
 
 CXX = g++-4.8
 CXXFLAGS += -std=c++0x
