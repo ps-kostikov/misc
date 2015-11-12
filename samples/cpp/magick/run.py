@@ -13,7 +13,7 @@ class MRLogger:
     def log(self, msg, data=None):
         logging.debug("mapreduce: %s %s", msg, str(data))
 
-with MrHolder(logger=MRLogger(), regular_binaries=['./sample']) as mr:
+with MrHolder(logger=MRLogger(), default_jobcount=1, regular_binaries=['./sample', './xc:#000000000000']) as mr:
     tmp_in = mr.temp()
     Record = collections.namedtuple('Record', 'key subkey value')
     records = [
