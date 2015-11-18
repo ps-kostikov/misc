@@ -7,7 +7,7 @@ class Image
 {
 public:
     Image() {
-        // Magick::Image image("256x256", "black");
+        Magick::Image image("256x256", "black");
     }
 };
 

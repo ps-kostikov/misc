@@ -1,3 +1,11 @@
+SRCPKG = sample
+
+USE += g++-4.6
+
+BUILD_DEPENDS = \
+	libboost-dev \
+
+
 LIB := sample 
 
 sample: SRCS = \
