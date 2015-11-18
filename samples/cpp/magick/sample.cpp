@@ -4,10 +4,9 @@
 
 #include <Magick++.h>
 
-int main(int argc,char **argv) 
+int main(int /*argc*/,char **argv) 
 { 
-    // Magick::InitializeMagick(*argv);
-    Magick::InitializeMagick(".");
+    Magick::InitializeMagick(*argv);
 
     try { 
         Magick::Image image("256x256", "black");
