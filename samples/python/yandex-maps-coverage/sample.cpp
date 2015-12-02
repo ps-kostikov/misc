@@ -38,16 +38,19 @@ int main()
     mc5::Coverage coverage("out.mms.1");
     const auto& layer = coverage["map"];
     
-    auto regions = layer.regions(maps::geolib3::Point2(37., 55.), 16);
-    for (const auto& region: regions) {
+    for (const auto& region: layer.regions(maps::geolib3::Point2(37., 55.), 16)) {
         std::cout << region << std::endl;
     }
     std::cout << std::endl;
 
     mt5::Tile tile(19808, 10275, 15);
     // tileToBbox(tile);
-    auto regions2 = layer.regions(tileToBbox(tile), tile.scale());
-    for (const auto& region: regions2) {
+    for (const auto& region: layer.regions(tileToBbox(tile), tile.scale())) {
+        std::cout << region << std::endl;
+    }
+    std::cout << std::endl;
+
+    for (const auto& region: layer.regions(boost::none)) {
         std::cout << region << std::endl;
     }
     std::cout << std::endl;
