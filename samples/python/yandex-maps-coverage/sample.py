@@ -2,7 +2,7 @@ import collections
 import shapely.wkt
 
 import xml
-# import geometry
+import geometry
 
 
 Map = collections.namedtuple("Map", "geom zmin zmax vendor map")
@@ -32,19 +32,22 @@ def region_ET(map_, geom):
 
 def generate_tileindex_cov4_ET(layer, maps):
 
-    def process_polygon(feature_members, map_, geom):
-        geom = xml.transform_polygon(geom)
-        if geom:
-            feature_members.append(region_ET(map_, geom))
+    # def process_polygon(feature_members, map_, geom):
+    #     geom = xml.transform_polygon(geom)
+    #     if geom:
+    #         feature_members.append(region_ET(map_, geom))
 
     ymaps = xml.YM_EM.ymaps()
     feature_members = xml.GML_EM.featureMembers()
     for map_ in maps:
-        if map_.geom.type == 'MultiPolygon':
-            map(lambda g: process_polygon(feature_members, map_, g),
-                map_.geom.geoms)
-        else:
-            process_polygon(feature_members, map_, map_.geom)
+        feature_members.append(region_ET(map_, geometry.geom_merc_to_geo(geom)))
+
+
+        # if map_.geom.type == 'MultiPolygon':
+        #     map(lambda g: process_polygon(feature_members, map_, g),
+        #         map_.geom.geoms)
+        # else:
+        #     process_polygon(feature_members, map_, map_.geom)
 
     layer_meta_data = xml.CVR_EM.CoverageMetaData(xml.CVR_EM.id(layer))
 
