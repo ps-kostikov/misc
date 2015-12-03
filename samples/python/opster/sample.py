@@ -15,8 +15,9 @@ import requests
 @opster.command(name='command1')
 def remove_tileindex_hook(
         param1=('', '', ''),
-        param2=('', '', '')):
-    pass
+        param_param2=('', '', '')):
+    print 'param1 =', param1
+    print 'param_param2 =', param_param2
 
 
 @opster.command(name='command2')
