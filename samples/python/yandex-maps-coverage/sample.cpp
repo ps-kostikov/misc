@@ -35,7 +35,8 @@ mg3::BoundingBox tileToBbox(const mt5::Tile& tile)
 int main()
 {
     std::cout << "hello" << std::endl;
-    mc5::Coverage coverage("out.mms.1");
+    // mc5::Coverage coverage("out.mms.1");
+    mc5::Coverage coverage("mms");
     const auto& layer = coverage["map"];
     
     for (const auto& region: layer.regions(maps::geolib3::Point2(37., 55.), 16)) {
@@ -43,17 +44,23 @@ int main()
     }
     std::cout << std::endl;
 
-    mt5::Tile tile(19808, 10275, 15);
-    // tileToBbox(tile);
-    for (const auto& region: layer.regions(tileToBbox(tile), tile.scale())) {
+
+    for (const auto& region: coverage["skl"].regions(maps::geolib3::Point2(37., 55.), 12)) {
         std::cout << region << std::endl;
     }
     std::cout << std::endl;
 
-    for (const auto& region: layer.regions(boost::none)) {
-        std::cout << region << std::endl;
-    }
-    std::cout << std::endl;
+    // mt5::Tile tile(19808, 10275, 15);
+    // // tileToBbox(tile);
+    // for (const auto& region: layer.regions(tileToBbox(tile), tile.scale())) {
+    //     std::cout << region << std::endl;
+    // }
+    // std::cout << std::endl;
+
+    // for (const auto& region: layer.regions(boost::none)) {
+    //     std::cout << region << std::endl;
+    // }
+    // std::cout << std::endl;
 
     return 0;
 }

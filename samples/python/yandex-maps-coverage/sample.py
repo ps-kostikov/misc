@@ -5,49 +5,35 @@ import xml
 import geometry
 
 
-Map = collections.namedtuple("Map", "geom zmin zmax vendor map")
+RegionInfo = collections.namedtuple("RegionInfo", "geom zmin zmax vendor map")
 
 
-def region_ET(map_, geom):
-    coverage_member_metadata = xml.CVR_EM.CoverageMemberMetaData(
-        xml.CVR_EM.zoomRange({"min": str(map_.zmin),
-                          "max": str(map_.zmax)}))
-    # if scalable:
-    #     coverage_member_metadata.append(CVR_EM.MetaData(EM.scaled("true")))
+def generate_tileindex_cov4_ET(layer, region_infos):
 
-    coverage_member_metadata.append(
-        xml.CVR_EM.MetaData(
-            xml.EM.vendor(map_.vendor),
-            xml.EM.map(map_.map)
+    def region_ET(region_info):
+        coverage_member_metadata = xml.CVR_EM.CoverageMemberMetaData(
+            xml.CVR_EM.zoomRange({
+                "min": str(region_info.zmin),
+                "max": str(region_info.zmax)
+            }))
+
+        coverage_member_metadata.append(
+            xml.CVR_EM.MetaData(
+                xml.EM.vendor(region_info.vendor),
+                xml.EM.map(region_info.map)
+            )
         )
-    )
 
-    # for region_vendor_ET in region_vendors_ETs(cinfo, vendors_dict):
-    #     coverage_member_metadata.append(region_vendor_ET)
+        return xml.YM_EM.GeoObject(
+                xml.GML_EM.metaDataProperty(coverage_member_metadata),
+                xml.geom_to_gml(geometry.geom_merc_to_geo(region_info.geom)))
 
-    return xml.YM_EM.GeoObject(
-            xml.GML_EM.metaDataProperty(coverage_member_metadata),
-            xml.geom_to_gml(geom))
-
-
-def generate_tileindex_cov4_ET(layer, maps):
-
-    # def process_polygon(feature_members, map_, geom):
-    #     geom = xml.transform_polygon(geom)
-    #     if geom:
-    #         feature_members.append(region_ET(map_, geom))
 
     ymaps = xml.YM_EM.ymaps()
+
     feature_members = xml.GML_EM.featureMembers()
-    for map_ in maps:
-        feature_members.append(region_ET(map_, geometry.geom_merc_to_geo(geom)))
-
-
-        # if map_.geom.type == 'MultiPolygon':
-        #     map(lambda g: process_polygon(feature_members, map_, g),
-        #         map_.geom.geoms)
-        # else:
-        #     process_polygon(feature_members, map_, map_.geom)
+    for region_info in region_infos:
+        feature_members.append(region_ET(region_info))
 
     layer_meta_data = xml.CVR_EM.CoverageMetaData(xml.CVR_EM.id(layer))
 
@@ -66,16 +52,25 @@ def generate_tileindex_cov4_ET(layer, maps):
 with open('russia.4268.wkt') as f:
     geom = shapely.wkt.loads(f.read())
 
-et = generate_tileindex_cov4_ET(
-    'map',
-    [Map(
+layer_to_region_infos = {
+    'map': [RegionInfo(
         geom=geom,
         zmin=0,
         zmax=18,
         vendor='yandex',
         map='map_russia_1111.xml'
-    )]
-)
+    )],
+    'skl': [RegionInfo(
+        geom=geom,
+        zmin=1,
+        zmax=14,
+        vendor='navteq',
+        map='skl_europe_222.xml'
+    )],
+}
 
-with open("out.xml", "w") as coverage_file:
-    coverage_file.write(xml.et_to_string(et))
+for layer, region_infos in layer_to_region_infos.iteritems():
+    et = generate_tileindex_cov4_ET(layer, region_infos)
+
+    with open("cov4/{0}.xml".format(layer), "w") as coverage_file:
+        coverage_file.write(xml.et_to_string(et))
