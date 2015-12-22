@@ -42,6 +42,19 @@ YCR_RESPOND_TO("sample:/company", c_name)
     response["Content-Type"] = "application/json";
 }
 
+YCR_RESPOND_TO("sample:/vendor/$/info")
+{
+    std::string vendor = argv[0];
+
+    mj::Builder builder;
+    builder << [&](mj::ObjectBuilder builder) {
+        builder["vendor"] = vendor;
+    };
+    response << builder.str();
+    response["Content-Type"] = "application/json";
+}
+
+
 int main(int /*argc*/, const char** /*argv*/)
 {
     INFO() << "Initializing";
