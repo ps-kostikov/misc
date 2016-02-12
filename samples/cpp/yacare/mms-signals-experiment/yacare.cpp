@@ -3,6 +3,7 @@
 #include <yandex/maps/yacare.h>
 
 #include <yandex/maps/mms/holder2.h>
+#include <yandex/maps/mms/mmap.h>
 
 #include <boost/optional.hpp>
 
@@ -29,18 +30,31 @@ getOptionalParam(const yacare::Request& r, const std::string& name)
 
 YCR_RESPOND_TO("sample:/tiles")
 {
-    auto x = *getOptionalParam<uint64_t>(request, "x");
-    auto y = *getOptionalParam<uint64_t>(request, "y");
-    auto z = *getOptionalParam<uint64_t>(request, "z");
+    auto xOpt = getOptionalParam<uint64_t>(request, "x");
+    auto yOpt = getOptionalParam<uint64_t>(request, "y");
+    auto zOpt = getOptionalParam<uint64_t>(request, "z");
+    if (not xOpt or not yOpt or not zOpt) {
+        throw yacare::errors::BadRequest();
+    }
 
-    response << (*(*gLayerHolder)).tiles[Tile{x, y, z}];
+    Tile tile{*xOpt, *yOpt, *zOpt};
+    auto& tiles = (*(*gLayerHolder)).tiles;
+    auto it = tiles.find(tile);
+    if (it == tiles.end()) {
+        throw yacare::errors::NotFound();
+    }
     response["Content-Type"] = "image/png";
+    response << it->second;
 }
 
 int main(int /*argc*/, const char** /*argv*/)
 {
-    gLayerHolder.reset(new mms::Holder2<Layer<mms::Mmapped>>("layer.mms"));
+    // mms::Mmap mmap("layer.mms", MAP_PRIVATE);
+    // gLayerHolder.reset(new mms::Holder2<Layer<mms::Mmapped>>("layer.mms", MAP_PRIVATE | MAP_POPULATE));
+    // gLayerHolder.reset(new mms::Holder2<Layer<mms::Mmapped>>("layer.mms", MAP_PRIVATE));
+    gLayerHolder.reset(new mms::Holder2<Layer<mms::Mmapped>>("layer.mms", MAP_SHARED));
     
+    std::cout << "Total tiles loaded = " << (*(*gLayerHolder)).tiles.size() << std::endl;
     // std::ifstream f(argv[1]);
     // std::string data((std::istreambuf_iterator<char>(f)),
     //                  std::istreambuf_iterator<char>());
