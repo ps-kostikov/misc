@@ -1,3 +1,6 @@
+#include <yandex/maps/mms/map.h>
+#include <yandex/maps/mms/string.h>
+
 #include <cstddef>
 
 struct Tile
@@ -21,4 +24,16 @@ struct Address
 {
     unsigned long offset;
     size_t size;
+};
+
+template<class P>
+struct Index {
+
+    Index() {}
+
+    mms::map<P, Tile, Address> tiles;
+
+    template<class A> void traverseFields(A a) const {
+        a(tiles);
+    }
 };

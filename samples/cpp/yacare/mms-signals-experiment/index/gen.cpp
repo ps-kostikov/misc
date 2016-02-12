@@ -9,10 +9,9 @@
 
 int main()
 {
-    std::map<Tile, Address> index;
     unsigned long currentPos = 0;
 
-    std::ofstream indexF("layer.index");
+    Index<mms::Standalone> index;
     std::ofstream dataF("layer.data");
     const size_t size = 2019;
 
@@ -21,8 +20,7 @@ int main()
         size_t x, y, z;
         ss >> x >> y >> z;
 
-        index[Tile{x, y, z}] = Address{currentPos, size};
-        indexF << x << " " << y << " " << z << " " << currentPos << " " << size << std::endl;
+        index.tiles[Tile{x, y, z}] = Address{currentPos, size};
 
         std::stringstream headSS;
         headSS << x << " " << y << " " << z << " ";
@@ -32,7 +30,13 @@ int main()
         currentPos += size;
     }
 
-    std::cout << "number of tiles = " << index.size() << std::endl;
+    std::cout << "number of tiles = " << index.tiles.size() << std::endl;
+
+    std::ofstream out("index.mms");
+    mms::Writer w(out);
+    size_t ofs = mms::safeWrite(w, index);
+    std::cout << "index file size = " << ofs << std::endl;
+    out.close();
 
 
     return 0;

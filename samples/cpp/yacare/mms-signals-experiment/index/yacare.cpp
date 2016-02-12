@@ -1,21 +1,27 @@
 #include "common.h"
 
-#include <map>
-#include <sstream>
-#include <iostream>
-#include <string>
-#include <fstream>
-#include <memory>
+#include <yandex/maps/mms/mmap.h>
+#include <yandex/maps/mms/holder2.h>
 
-std::map<Tile, Address> index;
+#include <yandex/maps/yacare.h>
+
+#include <boost/optional.hpp>
+
+#include <map>
+#include <iostream>
+#include <fstream>
+
+
+std::unique_ptr<mms::Holder2<Index<mms::Mmapped>>> gIndexHolder;
 std::unique_ptr<std::ifstream> dataFPtr;
 
 std::string lookup(const Tile& tile)
 {
-    auto it = index.find(tile);
-    if (it == index.end()) {
-        return {};
-    }
+    auto& tileindex = (*(*gIndexHolder)).tiles;
+    auto it = tileindex.find(tile);
+    if (it == tileindex.end()) {
+        return {}; 
+    }   
     auto& address = it->second;
     dataFPtr->seekg(address.offset);
     std::string result(address.size, ' ');
@@ -23,9 +29,46 @@ std::string lookup(const Tile& tile)
     return result;
 }
 
-int main()
-{
 
+template <class T>
+boost::optional<T>
+getOptionalParam(const yacare::Request& r, const std::string& name)
+{
+    std::string strParam = r.input()[name];
+    if (strParam.empty()) {
+        return boost::none;
+    }
+    try {
+        return boost::lexical_cast<T>(strParam);
+    } catch (const boost::bad_lexical_cast&) {
+        throw yacare::errors::BadRequest() << " Invalid parameter: " << name << " : " << strParam;
+    }
+}
+
+
+YCR_RESPOND_TO("sample:/tiles")
+{
+    auto xOpt = getOptionalParam<uint64_t>(request, "x");
+    auto yOpt = getOptionalParam<uint64_t>(request, "y");
+    auto zOpt = getOptionalParam<uint64_t>(request, "z");
+    if (not xOpt or not yOpt or not zOpt) {
+        throw yacare::errors::BadRequest();
+    }
+
+    Tile tile{*xOpt, *yOpt, *zOpt};
+    auto result = lookup(tile);
+    if (result.size() == 0) {
+        throw yacare::errors::NotFound();
+    }
+    response["Content-Type"] = "image/png";
+    response << result;
+}
+
+int main(int /*argc*/, const char** /*argv*/)
+{
+    gIndexHolder.reset(new mms::Holder2<Index<mms::Mmapped>>("index.mms", MAP_SHARED));
+    std::cout << "Total tiles = " << (*(*gIndexHolder)).tiles.size() << std::endl;
+    /*
     std::ifstream indexF("layer.index");
     for (std::string line; std::getline(indexF, line); ) {
         std::stringstream ss(line);
@@ -33,13 +76,14 @@ int main()
         unsigned long offset;
         size_t size;
         ss >> x >> y >> z >> offset >> size;
-        index[Tile{x, y, z}] = Address{offset, size};
+        tileindex[Tile{x, y, z}] = Address{offset, size};
     }
-    std::cout << "number of tiles = " << index.size() << std::endl;
-
+    std::cout << "number of tiles = " << tileindex.size() << std::endl;
+*/
     dataFPtr.reset(new std::ifstream("layer.data"));
 
-    std::cout << lookup(Tile{4, 5, 7}) << std::endl;
-
+    INFO() << "Initializing";
+    yacare::run();
+    INFO() << "Shutting down";
     return 0;
 }
