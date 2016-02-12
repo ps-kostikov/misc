@@ -1,6 +1,8 @@
 #include <yandex/maps/mms/map.h>
 #include <yandex/maps/mms/string.h>
 
+#include <boost/functional/hash.hpp>
+
 #include <cstddef>
 
 struct Tile
@@ -20,11 +22,34 @@ bool operator<(const Tile& left, const Tile& right)
     return left.z < right.z;
 }
 
+struct TileHash
+{
+    size_t operator()(const Tile& tile) const {
+        size_t seed = 0;
+        boost::hash_combine(seed, tile.x);
+        boost::hash_combine(seed, tile.y);
+        boost::hash_combine(seed, tile.z);
+        return seed;
+    }
+};
+
+/*
+namespace std {
+    template<>
+    struct hash<Tile> : public TileHash {}; 
+}
+*/
+
 struct Address
 {
     unsigned long offset;
     size_t size;
 };
+
+bool operator==(const Tile& left, const Tile& right)
+{
+    return (left.x == right.x) and (left.y == right.y) and (left.z == right.z);
+}
 
 template<class P>
 struct Index {

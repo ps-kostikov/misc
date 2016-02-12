@@ -1,4 +1,5 @@
 #include "common.h"
+#include "lru_cache.h"
 
 #include <yandex/maps/mms/mmap.h>
 #include <yandex/maps/mms/holder2.h>
@@ -14,6 +15,7 @@
 
 std::unique_ptr<mms::Holder2<Index<mms::Mmapped>>> gIndexHolder;
 std::unique_ptr<std::ifstream> dataFPtr;
+LruCache<Tile, std::string, TileHash> cache(1000);
 
 std::string lookup(const Tile& tile)
 {
@@ -28,7 +30,6 @@ std::string lookup(const Tile& tile)
     dataFPtr->read(const_cast<char*>(result.data()), address.size);
     return result;
 }
-
 
 template <class T>
 boost::optional<T>
@@ -56,12 +57,12 @@ YCR_RESPOND_TO("sample:/tiles")
     }
 
     Tile tile{*xOpt, *yOpt, *zOpt};
-    auto result = lookup(tile);
-    if (result.size() == 0) {
+    auto result = cache.getOrEmplace(tile, lookup);
+    if (result->size() == 0) {
         throw yacare::errors::NotFound();
     }
     response["Content-Type"] = "image/png";
-    response << result;
+    response << *result;
 }
 
 int main(int /*argc*/, const char** /*argv*/)
