@@ -10,14 +10,18 @@ from yandex.maps.factory.config import config
 import mds
 
 
-logging.getLogger().setLevel(logging.DEBUG)
+logging.basicConfig(
+    format='[%(asctime)s] %(process)d/%(thread)d %(levelname)s %(name)s %(filename)s:%(lineno)s %(message)s',
+    level=logging.DEBUG
+)
 logging.info("hello")
 
 def gen_data():
     return 'c' * 10 * 1024
 
 
-n = 1000
+n = 1000000
+# n = 10
 threads_num = 8
 
 
@@ -62,9 +66,13 @@ begin = time.time()
 
 def do_insert(i):
     data = gen_data()
-    key = storage.write_data('stress_test_pkostikov_{0}_{1}'.format(i, task_id), data)
+    name = 'stress_test_pkostikov_{0}_{1}'.format(i, task_id)
+    logging.info("start cycle with {0}".format(name))
+    key = storage.write_data(name, data)
+    logging.info("{0} written, key: {1!r}".format(name, key))
     # print 'get key', key
     storage.delete(key)
+    logging.info("{0} deleted, key: {1!r}".format(name, key))
     # print 'deleted key', key
 
 insert_pool = multiprocessing.pool.ThreadPool(threads_num)
