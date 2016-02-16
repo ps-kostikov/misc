@@ -4,6 +4,7 @@ import time
 import collections
 import multiprocessing
 import logging
+import requests
 
 from yandex.maps.factory.config import config
 
@@ -21,7 +22,7 @@ def gen_data():
 
 
 n = 1000000
-# n = 10
+# n = 1000
 threads_num = 8
 
 
@@ -68,11 +69,32 @@ def do_insert(i):
     data = gen_data()
     name = 'stress_test_pkostikov_{0}_{1}'.format(i, task_id)
     logging.info("start cycle with {0}".format(name))
-    key = storage.write_data(name, data)
-    logging.info("{0} written, key: {1!r}".format(name, key))
+    try:
+        key = storage.write_data(name, data)
+    except mds.AlreadyExists as ex:
+        key = ex.available_key
+        logging.error("{0} already exists, available key: {1!r}".format(name, key))
+    except requests.Timeout:
+        logging.error("writing {0} get timeout error".format(name))
+        return
+    except:
+        logging.exception("unexpected exception while writing")
+        raise
+    else:
+        logging.info("{0} written, key: {1!r}".format(name, key))
     # print 'get key', key
-    storage.delete(key)
-    logging.info("{0} deleted, key: {1!r}".format(name, key))
+    try:
+        storage.delete(key)
+    except mds.NotFound:
+        logging.error("{0} not found, key: {1!r}".format(name, key))
+    except requests.Timeout:
+        logging.error("deleting {0} get timeout error, key: {1!r}".format(name, key))
+        return
+    except:
+        logging.exception("unexpected exception while deleting")
+        raise
+    else:
+        logging.info("{0} deleted, key: {1!r}".format(name, key))
     # print 'deleted key', key
 
 insert_pool = multiprocessing.pool.ThreadPool(threads_num)

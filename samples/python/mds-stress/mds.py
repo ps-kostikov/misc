@@ -1,6 +1,7 @@
 import logging
 import StringIO
 import requests
+import time
 
 from ytools import xml
 from yandex.maps.utils import common as common_utils
@@ -74,6 +75,8 @@ class MdsEngine(object):
         self.auth = Auth(auth_header)
         self.namespace = namespace
         self.subdir = subdir
+        self.session = requests.Session()
+        # self.session = requests
 
     def make_write_url(self, name):
         if not self.subdir:
@@ -109,7 +112,8 @@ class MdsEngine(object):
     def write(self, name, file_obj):
         url = self.make_write_url(name)
         # logging.debug(url)
-        resp = requests.post(url, auth=self.auth, data=file_obj, timeout=TIMEOUT_SEC)
+        resp = self.session.post(url, auth=self.auth, data=file_obj, timeout=TIMEOUT_SEC)
+        # resp = requests.post(url, auth=self.auth, data=file_obj, timeout=TIMEOUT_SEC)
 
         if resp.status_code == requests.codes.BAD_REQUEST:
             raise Error("Protocol miscommunication url: {0!r}".format(url), url, resp.status_code)
@@ -128,7 +132,8 @@ class MdsEngine(object):
 
     def delete(self, key):
         url = self.make_delete_url(key)
-        resp = requests.get(url, auth=self.auth, timeout=TIMEOUT_SEC)
+        # resp = requests.get(url, auth=self.auth, timeout=TIMEOUT_SEC)
+        resp = self.session.get(url, auth=self.auth, timeout=TIMEOUT_SEC)
         if resp.status_code == requests.codes.NOT_FOUND:
             raise NotFound(key, url)
         elif resp.status_code >= requests.codes.SERVER_ERROR:
@@ -138,7 +143,8 @@ class MdsEngine(object):
 
     def read(self, key, file_obj):
         url = self.make_read_url(key)
-        resp = requests.get(url, auth=self.auth, timeout=TIMEOUT_SEC)
+        resp = self.session.get(url, auth=self.auth, timeout=TIMEOUT_SEC)
+        # resp = requests.get(url, auth=self.auth, timeout=TIMEOUT_SEC)
         if resp.status_code == requests.codes.NOT_FOUND:
             raise NotFound(key, url)
         elif resp.status_code >= requests.codes.SERVER_ERROR:
@@ -168,15 +174,28 @@ class MdsStorage(object):
                 subdir=auth.subdir),
             config.retry_policy)
 
-    def do_retry(self, func):
-        return common_utils.retry(
-            exceptions=(requests.RequestException, ServerError),
-            tries=self.retry_policy.retry_number,
-            delay=self.retry_policy.wait_seconds,
-            backoff_multiplier=self.retry_policy.wait_factor,
-            logger=logging
-        )(func)()
+    # def do_retry(self, func):
+    #     return common_utils.retry(
+    #         exceptions=(requests.RequestException, ServerError),
+    #         tries=self.retry_policy.retry_number,
+    #         delay=self.retry_policy.wait_seconds,
+    #         backoff_multiplier=self.retry_policy.wait_factor,
+    #         logger=logging
+    #     )(func)()
 
+    def do_retry(self, func):
+        retry_number = self.retry_policy.retry_number
+        delay = self.retry_policy.wait_seconds
+        for i in range(retry_number):
+            try:
+                return func()
+            except (requests.RequestException, ServerError), ex: 
+                if i == retry_number - 1:
+                    raise
+                else:
+                    logging.exception("Attempt number {0} failed. Retrying in {1} seconds".format(i, delay))
+            time.sleep(delay)
+            delay *= self.retry_policy.wait_factor
 
     def write_data(self, name, data):
         file_obj = StringIO.StringIO(data)
