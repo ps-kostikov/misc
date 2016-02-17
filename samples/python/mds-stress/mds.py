@@ -76,6 +76,8 @@ class MdsEngine(object):
         self.namespace = namespace
         self.subdir = subdir
         self.session = requests.Session()
+        self.session.auth = self.auth
+        self.session.timeout = TIMEOUT_SEC
         # self.session = requests
 
     def make_write_url(self, name):
@@ -112,7 +114,7 @@ class MdsEngine(object):
     def write(self, name, file_obj):
         url = self.make_write_url(name)
         # logging.debug(url)
-        resp = self.session.post(url, auth=self.auth, data=file_obj, timeout=TIMEOUT_SEC)
+        resp = self.session.post(url, data=file_obj)
         # resp = requests.post(url, auth=self.auth, data=file_obj, timeout=TIMEOUT_SEC)
 
         if resp.status_code == requests.codes.BAD_REQUEST:
@@ -133,7 +135,7 @@ class MdsEngine(object):
     def delete(self, key):
         url = self.make_delete_url(key)
         # resp = requests.get(url, auth=self.auth, timeout=TIMEOUT_SEC)
-        resp = self.session.get(url, auth=self.auth, timeout=TIMEOUT_SEC)
+        resp = self.session.get(url)
         if resp.status_code == requests.codes.NOT_FOUND:
             raise NotFound(key, url)
         elif resp.status_code >= requests.codes.SERVER_ERROR:
@@ -143,7 +145,7 @@ class MdsEngine(object):
 
     def read(self, key, file_obj):
         url = self.make_read_url(key)
-        resp = self.session.get(url, auth=self.auth, timeout=TIMEOUT_SEC)
+        resp = self.session.get(url)
         # resp = requests.get(url, auth=self.auth, timeout=TIMEOUT_SEC)
         if resp.status_code == requests.codes.NOT_FOUND:
             raise NotFound(key, url)

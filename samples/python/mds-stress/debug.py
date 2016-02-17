@@ -22,7 +22,7 @@ def gen_data():
 
 
 n = 1000000
-# n = 1000
+# n = 10
 threads_num = 8
 
 
@@ -52,8 +52,8 @@ engine = mds.MdsEngine(
     subdir='pkostikov'
 )
 retry_policy = RetryPolicy(
-    retry_number=10,
-    wait_seconds=0.01,
+    retry_number=8,
+    wait_seconds=0.1,
     wait_factor=2
 )
 
