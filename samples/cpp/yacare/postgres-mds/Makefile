@@ -21,4 +21,14 @@ $(bin-name): INCLUDES += \
 CXX = g++-4.8
 CXXFLAGS += -std=c++0x
 
+
+CUR_DIR = $(shell pwd)
+
+stop:
+	/sbin/start-stop-daemon --stop --quiet --pidfile nginx.pid || true
+
+start: stop
+	nohup /usr/sbin/nginx -p $(CUR_DIR)/ -c nginx.conf &
+
+
 include /usr/share/yandex/maps/build/build.mk

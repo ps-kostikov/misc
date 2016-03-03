@@ -4,6 +4,7 @@
 
 #include <boost/optional.hpp>
 
+#include <chrono>
 #include <iostream>
 #include <sstream>
 
@@ -18,14 +19,14 @@ public:
     PgpoolLogger()
     { }
 
-    virtual void put(mpgp::logging::Message&& /*msg*/) override
+    virtual void put(mpgp::logging::Message&& msg) override
     {
-        // std::cout << msg.source << " " << msg.message << std::endl;
+        std::cout << msg.source << " " << msg.message << std::endl;
     }
 
     virtual mpgp::logging::Level level() const override
     {
-        return mpgp::logging::Level::Debug;
+        return mpgp::logging::Level::Info;
     }
 
     virtual std::string name() const override
@@ -50,7 +51,7 @@ getOptionalParam(const yacare::Request& r, const std::string& name)
     }
 }
 
-yacare::ThreadPool heavyPool(/* name = */ "heavy", /* threads  = */ 16, /* backlog = */ 16);
+yacare::ThreadPool heavyPool(/* name = */ "heavy", /* threads  = */ 32, /* backlog = */ 16);
 
 YCR_RESPOND_TO("sample:/signals-renderer", YCR_IN_POOL(heavyPool))
 {
@@ -64,14 +65,19 @@ YCR_RESPOND_TO("sample:/signals-renderer", YCR_IN_POOL(heavyPool))
     auto connection = g_poolPtr->getMasterConnection();
     auto transaction = mpgp::makeWriteableTransaction(std::move(connection));
     std::stringstream query;
-    query << "select mds_key from signals.signals_tiles where style = 'point'"
+    // query << "select mds_key from signals.signals_tiles where style = 'point'"
+    query << "select mds_key from signals_tiles where style = 'point'"
         << " and x = " << *xOpt
         << " and y = " << *yOpt
         << " and z = " << *zOpt
         << ";";
+    auto postgresQueryBegin = std::chrono::system_clock::now();
     auto result = transaction->exec(query.str());
+    auto postgresQueryEnd = std::chrono::system_clock::now();
+    std::chrono::duration<double> postgresQueryDuration = postgresQueryEnd - postgresQueryBegin;
 
     if (result.empty()) {
+        DEBUG() << "postgres time " << postgresQueryDuration.count() << "sec" << std::endl;
         throw yacare::errors::NotFound() << "no db record";
     }
 
@@ -80,19 +86,24 @@ YCR_RESPOND_TO("sample:/signals-renderer", YCR_IN_POOL(heavyPool))
     auto mdsKey = result[0][0];
 
     std::stringstream urlStr;
-    urlStr << "http://storage-int.mdst.yandex.net:80/get-mapsfactory_signals/" << mdsKey;
+    // urlStr << "http://storage-int.mdst.yandex.net:80/get-mapsfactory_signals/" << mdsKey;
     // urlStr << "http://storage-int.mds.yandex.net:80/get-mapsfactory_signals/" << mdsKey;
+    urlStr << "http://target056i.load.yandex.net:17083/get-mapsfactory_signals/" << mdsKey;
 
     const http2::URL url{urlStr.str()};
     http2::Client httpClient;
     httpClient.setConnectMethod(http2::connect_methods::withTimeout(
         std::chrono::milliseconds(5000)));
     http2::Request mdsRequest(httpClient, "GET", url);
+    auto mdsRequestBegin = std::chrono::system_clock::now();
     auto mdsResponse = mdsRequest.perform();
+    auto mdsRequestEnd = std::chrono::system_clock::now();
+    std::chrono::duration<double> mdsRequestDuration = mdsRequestEnd - mdsRequestBegin;
     
     if (mdsResponse.status() != 200) {
         throw yacare::errors::InternalError() << "mds returns not 200";
     }
+    std::cout << "postgres time " << postgresQueryDuration.count() << "sec; mds time " << mdsRequestDuration.count() << "sec" << std::endl;
     response["Content-Type"] = "image/png";
     response << mdsResponse.body().rdbuf();
     // response << mdsKey;
@@ -103,9 +114,10 @@ int main(int /*argc*/, const char** /*argv*/)
 
     mpgp::PoolConfigurationPtr poolConfiguration(mpgp::PoolConfiguration::create());
 
-    poolConfiguration->master = mpgp::InstanceId{"bko-pgm.tst.maps.yandex.ru", 5432};
+    poolConfiguration->master = mpgp::InstanceId{"target056i.load.yandex.net", 5432};
+    // poolConfiguration->master = mpgp::InstanceId{"bko-pgm.tst.maps.yandex.ru", 5432};
     // poolConfiguration->master = mpgp::InstanceId{"gpsdata-pgm.maps.yandex.ru", 5432};
-    mpgp::PoolConstantsPtr poolConstants(mpgp::PoolConstants::create(16, 16, 0, 0));
+    mpgp::PoolConstantsPtr poolConstants(mpgp::PoolConstants::create(32, 32, 0, 0));
     poolConstants->getTimeoutMs = 5000;
     poolConstants->pingIntervalMs = 5000;
 
@@ -113,7 +125,8 @@ int main(int /*argc*/, const char** /*argv*/)
     g_poolPtr.reset(new mpgp::Pool(
         logger,
         std::move(poolConfiguration),
-        "dbname=mapsfactory_signals user=mapsfactory password=V0j1TgArE",
+        "dbname=test user=mapadmin password=mapadmin",
+        // "dbname=mapsfactory_signals user=mapsfactory password=V0j1TgArE",
         std::move(poolConstants)
     ));
 
