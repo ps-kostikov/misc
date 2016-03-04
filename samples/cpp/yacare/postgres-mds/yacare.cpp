@@ -2,6 +2,8 @@
 #include <yandex/maps/pgpool3/pgpool3.h>
 #include <yandex/maps/http2.h>
 
+#include <cairo.h>
+
 #include <boost/optional.hpp>
 
 #include <chrono>
@@ -51,6 +53,31 @@ getOptionalParam(const yacare::Request& r, const std::string& name)
     }
 }
 
+cairo_surface_t* surface;
+
+void doSomething()
+{
+    unsigned char* data = cairo_image_surface_get_data(surface);
+    int width = cairo_image_surface_get_width (surface);
+    int height = cairo_image_surface_get_height (surface);
+    for (int i = 0; i < width * height; ++i) {
+        unsigned char* offset = data + 4 * i;
+        if (
+            (int(*(offset + 0)) == 255) and 
+            (int(*(offset + 1)) == 255) and
+            (int(*(offset + 2)) == 255)
+        ) {
+            continue;
+        }
+        if (int(*(offset + 3)) == 255) {
+            *(offset + 0) = '\0';
+            *(offset + 1) = '\0';           
+        }
+    }
+}
+
+
+
 yacare::ThreadPool heavyPool(/* name = */ "heavy", /* threads  = */ 32, /* backlog = */ 16);
 
 YCR_RESPOND_TO("sample:/signals-renderer", YCR_IN_POOL(heavyPool))
@@ -77,7 +104,7 @@ YCR_RESPOND_TO("sample:/signals-renderer", YCR_IN_POOL(heavyPool))
     std::chrono::duration<double> postgresQueryDuration = postgresQueryEnd - postgresQueryBegin;
 
     if (result.empty()) {
-        DEBUG() << "postgres time " << postgresQueryDuration.count() << "sec" << std::endl;
+        std::cout << "postgres time " << postgresQueryDuration.count() << "sec" << std::endl;
         throw yacare::errors::NotFound() << "no db record";
     }
 
@@ -103,7 +130,16 @@ YCR_RESPOND_TO("sample:/signals-renderer", YCR_IN_POOL(heavyPool))
     if (mdsResponse.status() != 200) {
         throw yacare::errors::InternalError() << "mds returns not 200";
     }
-    std::cout << "postgres time " << postgresQueryDuration.count() << "sec; mds time " << mdsRequestDuration.count() << "sec" << std::endl;
+
+    auto imageBegin = std::chrono::system_clock::now();
+    doSomething();
+    auto imageEnd = std::chrono::system_clock::now();
+    std::chrono::duration<double> imageDuration = imageEnd - imageBegin;
+
+    std::cout << "postgres time " << postgresQueryDuration.count() << "sec; "
+        << "mds time " << mdsRequestDuration.count() << "sec; "
+        << "image time " << imageDuration.count() << "sec" << std::endl;
+
     response["Content-Type"] = "image/png";
     response << mdsResponse.body().rdbuf();
     // response << mdsKey;
@@ -131,7 +167,9 @@ int main(int /*argc*/, const char** /*argv*/)
     ));
 
     INFO() << "Initializing";
+    surface = cairo_image_surface_create_from_png("test.png");
     yacare::run();
+    cairo_surface_destroy(surface);
     INFO() << "Shutting down";
     return 0;
 }
