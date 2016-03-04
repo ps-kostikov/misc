@@ -30,28 +30,22 @@ int main(int /*argc*/,char** /*argv*/)
     for (int i = 0; i < width * height; ++i) {
         unsigned char* offset = data + 4 * i;
         if (
-            (int(*(offset + 0)) == 255) and 
-            (int(*(offset + 1)) == 255) and
-            (int(*(offset + 2)) == 255)
+            (int(*(offset + 0)) > 220) and 
+            (int(*(offset + 1)) > 220) and
+            (int(*(offset + 2)) > 220)
         ) {
             continue;
         }
+        // if (
+        //     (int(*(offset + 0)) == int(*(offset + 1))) and
+        //     (int(*(offset + 2)) == int(*(offset + 2))) 
+        // ) {
+        //     continue;
+        // }
         if (int(*(offset + 3)) == 255) {
             *(offset + 0) = '\0';
             *(offset + 1) = '\0';           
         }
-
-        // if (
-        //     (int(*(offset + 0)) == 255) and 
-        //     (int(*(offset + 1)) == 255) and
-        //     (int(*(offset + 2)) == 255)
-        // ) {
-        //     std::cout << "hello" << std::endl;
-        //     continue;
-        // }
-        // *(offset + 0) = '\0';
-        // *(offset + 1) = '\0';
-        // *(offset + 2) = *(offset + 3);
     }
     // cairo_t* cr = cairo_create(surface);
     // if (cr == NULL) {
