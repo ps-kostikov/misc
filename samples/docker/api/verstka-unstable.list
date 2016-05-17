@@ -1,0 +1,5 @@
+deb http://verstka.dist.yandex.ru/verstka stable/all/
+deb http://verstka.dist.yandex.ru/verstka stable/$(ARCH)/
+
+deb http://verstka.dist.yandex.ru/verstka unstable/all/
+deb http://verstka.dist.yandex.ru/verstka unstable/$(ARCH)/
