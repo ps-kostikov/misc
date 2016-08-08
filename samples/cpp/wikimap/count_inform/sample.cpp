@@ -92,7 +92,7 @@ int main(int argc, const char** argv)
         authParams,
         std::move(poolConstants)
     ));
-    auto userMap = maps::wiki::releases_notification::getVecReleaseUsers(*pool, sinceBranchId, tillBranchId);
+    auto userMap = maps::wiki::releases_notification::getVecReleaseUsers_original(*pool, sinceBranchId, tillBranchId);
 
     auto exclUids = excludedUids(*pool);
 

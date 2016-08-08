@@ -105,7 +105,7 @@ private:
     social::Gateway socialGateway_;
 };
 
-std::map<revision::UserID, VecUserData> getVecReleaseUsers(
+std::map<revision::UserID, VecUserData> getVecReleaseUsers_original(
     maps::pgpool3::Pool& pool,
     revision::DBID sinceBranchId,
     revision::DBID tillBranchId
@@ -446,7 +446,7 @@ prepareSenderDataForVecRelease(
     maps::pgpool3::Pool& longReadPool,
     const NotificationEmailParams& baseMessage)
 {
-    auto users = getVecReleaseUsers(
+    auto users = getVecReleaseUsers_original(
         longReadPool,
         params.sinceBranchId(),
         params.tillBranchId());
