@@ -117,62 +117,53 @@ std::map<revision::UserID, VecUserData> getVecReleaseUsers(
     revision::BranchManager branchManager(*txn);
 
     std::map<revision::UserID, VecUserData> committedUsers;
-    for (revision::DBID branchId = sinceBranchId + 1; branchId <= tillBranchId; branchId++) {
-        std::unique_ptr<revision::Branch> branchPtr;
-        try {
-            branchPtr.reset(new revision::Branch(branchManager.load(branchId)));
-        } catch (const revision::BranchNotExistsException&) {
-            if (branchId == tillBranchId) {
-                throw;
-            } else {
-                continue;
-            }
-        }
-        auto commits = revision::Commit::load(
-            *txn,
-            revision::filters::CommitAttr::stableBranchId() == branchId &&
-            revision::filters::CommitAttr::isTrunk()
-            );
 
-        revision::DBIDSet revertedCommitIds;
-        for (const auto& commit: commits) {
-            const auto& curRevertedCommitIds = commit.revertedCommitIds();
-            revertedCommitIds.insert(curRevertedCommitIds.begin(), curRevertedCommitIds.end());
-        }
+    auto commits = revision::Commit::load(
+        *txn,
+        revision::filters::CommitAttr::stableBranchId() > sinceBranchId &&
+        revision::filters::CommitAttr::stableBranchId() <= tillBranchId &&
+        revision::filters::CommitAttr::isTrunk()
+        );
 
-        PublicationZone publicationZone(*txn, *branchPtr);
-
-        CommitsBatch batch;
-        auto processBatch = [&]()
-        {
-            if (batch.empty()) {
-                return;
-            }
-            social::TIds batchCommitIds;
-            for (const auto& commit: batch) {
-                batchCommitIds.insert(commit.id());
-            }
-            auto filteredCommitIds = publicationZone.filterIntersectCommits(batchCommitIds);
-            for (const auto& commit: batch) {
-                if (filteredCommitIds.count(commit.id())) {
-                    if (committedUsers.count(commit.createdBy()) == 0) {
-                        committedUsers[commit.createdBy()] = VecUserData(commit.createdBy());
-                    }
-                    committedUsers[commit.createdBy()].addCommit(commit);
-                }
-            }
-            batch.clear();
-        };
-        for (const auto& commit: commits) {
-            if (revertedCommitIds.count(commit.id()) == 0) {
-                batch.push_back(commit);
-            }
-            if (batch.size() == BATCH_SIZE) {
-                processBatch();
-            }
-        }
-        processBatch();
+    revision::DBIDSet revertedCommitIds;
+    for (const auto& commit: commits) {
+        const auto& curRevertedCommitIds = commit.revertedCommitIds();
+        revertedCommitIds.insert(curRevertedCommitIds.begin(), curRevertedCommitIds.end());
     }
+
+    auto tillBranch = branchManager.load(tillBranchId);
+    PublicationZone publicationZone(*txn, tillBranch);
+
+    CommitsBatch batch;
+    auto processBatch = [&]()
+    {
+        if (batch.empty()) {
+            return;
+        }
+        social::TIds batchCommitIds;
+        for (const auto& commit: batch) {
+            batchCommitIds.insert(commit.id());
+        }
+        auto filteredCommitIds = publicationZone.filterIntersectCommits(batchCommitIds);
+        for (const auto& commit: batch) {
+            if (filteredCommitIds.count(commit.id())) {
+                if (committedUsers.count(commit.createdBy()) == 0) {
+                    committedUsers[commit.createdBy()] = VecUserData(commit.createdBy());
+                }
+                committedUsers[commit.createdBy()].addCommit(commit);
+            }
+        }
+        batch.clear();
+    };
+    for (const auto& commit: commits) {
+        if (revertedCommitIds.count(commit.id()) == 0) {
+            batch.push_back(commit);
+        }
+        if (batch.size() == BATCH_SIZE) {
+            processBatch();
+        }
+    }
+    processBatch();
 
     INFO() << "Found " << committedUsers.size() << " unique users";
     return committedUsers;
