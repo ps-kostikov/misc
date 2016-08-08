@@ -1,7 +1,7 @@
 BIN := sample 
 
 sample: SRCS = \
-    sample.cpp \
+	sample.cpp \
 	releases_notification.cpp \
 	blackbox.cpp \
 	sender.cpp \
@@ -25,9 +25,12 @@ sample: LIBS = \
 	yandex-maps-wiki-social \
 	yandex-maps-xml3 \
 	xml2 \
+	yandex-maps-pqxx \
+	yandex-maps-ssl \
+	crypto \
 
 sample: INCLUDES += \
-    /usr/include/pqxx \
+	/usr/include/yandex/maps/pqxx \
 	/usr/include/libxml2 \
 
 CXX = g++-4.8

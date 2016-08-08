@@ -38,14 +38,18 @@ int main(int argc, const char** argv)
 
     std::cout << "hello" << std::endl;
     std::cout << "argc = " << argc << std::endl;
-    if (argc < 2) {
-        std::cout << "connection string should be specified" << std::endl;
+    if (argc < 4) {
+        std::cout << "expected cmd line: ./<exe> <connection string> <since branch id> <till branch id>" << std::endl;
         return 1;
     }
 
     std::string connStr(argv[1]);
+    auto sinceBranchId = boost::lexical_cast<maps::wiki::revision::DBID>(argv[2]);
+    auto tillBranchId = boost::lexical_cast<maps::wiki::revision::DBID>(argv[3]);
 
     std::cout << "connection string = '" << connStr << "'" << std::endl;
+    std::cout << "since branch id = " << sinceBranchId << std::endl;
+    std::cout << "till branch id = " << tillBranchId << std::endl;
 
     mpgp::PoolConfigurationPtr poolConfiguration(mpgp::PoolConfiguration::create());
     std::string authParams;
@@ -61,7 +65,7 @@ int main(int argc, const char** argv)
         authParams,
         std::move(poolConstants)
     ));
-    auto userMap = maps::wiki::releases_notification::getVecReleaseUsers(*pool, 145, 146);
+    auto userMap = maps::wiki::releases_notification::getVecReleaseUsers(*pool, sinceBranchId, tillBranchId);
     std::cout << "size = " << userMap.size() << std::endl;
 
 
