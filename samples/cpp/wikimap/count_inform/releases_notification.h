@@ -49,6 +49,16 @@ std::map<maps::wiki::revision::UserID, VecUserData> getVecReleaseUsers_original(
     maps::wiki::revision::DBID sinceBranchId,
     maps::wiki::revision::DBID tillBranchId);
 
+std::map<maps::wiki::revision::UserID, VecUserData> getVecReleaseUsers_takeAllRevertedInAccount(
+    maps::pgpool3::Pool& pool,
+    maps::wiki::revision::DBID sinceBranchId,
+    maps::wiki::revision::DBID tillBranchId);
+
+std::map<maps::wiki::revision::UserID, VecUserData> getVecReleaseUsers_onlyLastCommits(
+    maps::pgpool3::Pool& pool,
+    maps::wiki::revision::DBID sinceBranchId,
+    maps::wiki::revision::DBID tillBranchId);
+
 std::map<revision::UserID, SatUserData> getSatReleaseUsers(
     maps::pgpool3::Pool& pool,
     const common::Geom& releaseGeom);
