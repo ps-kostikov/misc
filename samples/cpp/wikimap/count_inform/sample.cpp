@@ -10,6 +10,7 @@
 #include <string>
 
 namespace mpgp = maps::pgpool3;
+namespace mw = maps::wiki;
 
 class PgpoolLogger: public mpgp::logging::Logger
 {
@@ -33,11 +34,11 @@ public:
     }
 };
 
-std::set<maps::wiki::revision::UserID> excludedUids(mpgp::Pool& pool)
+std::set<mw::revision::UserID> excludedUids(mpgp::Pool& pool)
 {
     auto connection = pool.getMasterConnection();
     auto transaction = mpgp::makeReadOnlyTransaction(std::move(connection));
-    maps::wiki::acl::ACLGateway aclGw(*transaction);
+    mw::acl::ACLGateway aclGw(*transaction);
 
     std::vector<std::string> groupNames{
         "mpro",
@@ -45,7 +46,7 @@ std::set<maps::wiki::revision::UserID> excludedUids(mpgp::Pool& pool)
         "ya-support",
         "yandex-moderators"
     };
-    std::set<maps::wiki::revision::UserID> result;
+    std::set<mw::revision::UserID> result;
     for (const auto& groupName: groupNames) {
         try {
             auto group = aclGw.group(groupName);
@@ -59,68 +60,23 @@ std::set<maps::wiki::revision::UserID> excludedUids(mpgp::Pool& pool)
     return result;
 }
 
-void printOriginalStats(
-    maps::pgpool3::Pool& pool,
-    maps::wiki::revision::DBID sinceBranchId,
-    maps::wiki::revision::DBID tillBranchId,
-    const std::set<maps::wiki::revision::UserID>& exclUids)
+void printStats(
+    const std::map<mw::revision::UserID, mw::releases_notification::VecUserData>& userMap,
+    const std::set<mw::revision::UserID>& exclUids)
 {
-    auto userMap = maps::wiki::releases_notification::getVecReleaseUsers_original(pool, sinceBranchId, tillBranchId);
-    std::map<maps::wiki::revision::UserID, maps::wiki::releases_notification::VecUserData> finalMap;
+    std::map<mw::revision::UserID, mw::releases_notification::VecUserData> afterExcl;
     for (const auto& p: userMap) {
         if (exclUids.count(p.first) == 0) {
-            finalMap[p.first] = p.second;
+            afterExcl[p.first] = p.second;
         }
     }
-    std::cout << "original:" << std::endl;
-    std::cout << "size = " << finalMap.size() << std::endl;
-    // for (const auto& p: finalMap) {
-    //     std::cout << "uid = " << p.first << " commits count = " << p.second.getCommitsCount() << std::endl;
-    // }
-}
-
-void printTakeAllRevertedInAccountStats(
-    maps::pgpool3::Pool& pool,
-    maps::wiki::revision::DBID sinceBranchId,
-    maps::wiki::revision::DBID tillBranchId,
-    const std::set<maps::wiki::revision::UserID>& exclUids)
-{
-    auto userMap = maps::wiki::releases_notification::getVecReleaseUsers_takeAllRevertedInAccount(pool, sinceBranchId, tillBranchId);
-    std::map<maps::wiki::revision::UserID, maps::wiki::releases_notification::VecUserData> finalMap;
-    for (const auto& p: userMap) {
-        if (exclUids.count(p.first) == 0) {
-            finalMap[p.first] = p.second;
-        }
+    std::cout << "total users = " << afterExcl.size() << std::endl;
+    int commitCount = 0;
+    for (const auto& p: afterExcl) {
+        commitCount += p.second.getCommitsCount();
     }
-    std::cout << "take all reverts in account:" << std::endl;
-    std::cout << "size = " << finalMap.size() << std::endl;
-    // for (const auto& p: finalMap) {
-    //     std::cout << "uid = " << p.first << " commits count = " << p.second.getCommitsCount() << std::endl;
-    // }
-
+    std::cout << "total commits = " << commitCount << std::endl;
 }
-
-void printOnlyLastCommitsStats(
-    maps::pgpool3::Pool& pool,
-    maps::wiki::revision::DBID sinceBranchId,
-    maps::wiki::revision::DBID tillBranchId,
-    const std::set<maps::wiki::revision::UserID>& exclUids)
-{
-    auto userMap = maps::wiki::releases_notification::getVecReleaseUsers_onlyLastCommits(pool, sinceBranchId, tillBranchId);
-    std::map<maps::wiki::revision::UserID, maps::wiki::releases_notification::VecUserData> finalMap;
-    for (const auto& p: userMap) {
-        if (exclUids.count(p.first) == 0) {
-            finalMap[p.first] = p.second;
-        }
-    }
-    std::cout << "only snapshot commits:" << std::endl;
-    std::cout << "size = " << finalMap.size() << std::endl;
-    // for (const auto& p: finalMap) {
-    //     std::cout << "uid = " << p.first << " commits count = " << p.second.getCommitsCount() << std::endl;
-    // }
-
-}
-
 
 int main(int argc, const char** argv)
 {
@@ -133,8 +89,8 @@ int main(int argc, const char** argv)
     }
 
     std::string connStr(argv[1]);
-    auto sinceBranchId = boost::lexical_cast<maps::wiki::revision::DBID>(argv[2]);
-    auto tillBranchId = boost::lexical_cast<maps::wiki::revision::DBID>(argv[3]);
+    auto sinceBranchId = boost::lexical_cast<mw::revision::DBID>(argv[2]);
+    auto tillBranchId = boost::lexical_cast<mw::revision::DBID>(argv[3]);
 
     std::cout << "connection string = '" << connStr << "'" << std::endl;
     std::cout << "since branch id = " << sinceBranchId << std::endl;
@@ -157,10 +113,20 @@ int main(int argc, const char** argv)
 
     auto exclUids = excludedUids(*pool);
 
-    // printOriginalStats(*pool, sinceBranchId, tillBranchId, exclUids);
-    // printTakeAllRevertedInAccountStats(*pool, sinceBranchId, tillBranchId, exclUids);
-    printOnlyLastCommitsStats(*pool, sinceBranchId, tillBranchId, exclUids);
-
-
+    std::cout << "original:" << std::endl;
+    printStats(
+        mw::releases_notification::getVecReleaseUsers_original(
+            *pool, sinceBranchId, tillBranchId),
+        exclUids);
+    std::cout << "take all reverts in account:" << std::endl;
+    printStats(
+        mw::releases_notification::getVecReleaseUsers_takeAllRevertedInAccount(
+            *pool, sinceBranchId, tillBranchId),
+        exclUids);
+    std::cout << "only snapshot commits:" << std::endl;
+    printStats(
+        mw::releases_notification::getVecReleaseUsers_onlyLastCommits(
+            *pool, sinceBranchId, tillBranchId),
+        exclUids);
     return 0;
 }
