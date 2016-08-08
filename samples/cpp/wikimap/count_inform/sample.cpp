@@ -33,6 +33,33 @@ public:
     }
 };
 
+std::set<maps::wiki::revision::UserID> excludedUids(mpgp::Pool& pool)
+{
+    auto connection = pool.getMasterConnection();
+    auto transaction = mpgp::makeReadOnlyTransaction(std::move(connection));
+    maps::wiki::acl::ACLGateway aclGw(*transaction);
+
+    std::vector<std::string> groupNames{
+        "mpro",
+        "cartographers-group",
+        "ya-support",
+        "yandex-moderators"
+    };
+    std::set<maps::wiki::revision::UserID> result;
+    for (const auto& groupName: groupNames) {
+        try {
+            auto group = aclGw.group(groupName);
+            for (const auto& user: group.users()) {
+                result.insert(user.uid());
+            }
+        } catch (...) {
+            ;
+        }
+    }
+    return result;
+}
+
+
 int main(int argc, const char** argv)
 {
 
@@ -66,7 +93,22 @@ int main(int argc, const char** argv)
         std::move(poolConstants)
     ));
     auto userMap = maps::wiki::releases_notification::getVecReleaseUsers(*pool, sinceBranchId, tillBranchId);
-    std::cout << "size = " << userMap.size() << std::endl;
+
+    auto exclUids = excludedUids(*pool);
+
+    std::map<maps::wiki::revision::UserID, maps::wiki::releases_notification::VecUserData> finalMap;
+
+    for (const auto& p: userMap) {
+        if (exclUids.count(p.first) == 0) {
+            finalMap[p.first] = p.second;
+        }
+    }
+
+    std::cout << "size = " << finalMap.size() << std::endl;
+
+    for (const auto& p: finalMap) {
+        std::cout << "uid = " << p.first << " commits count = " << p.second.getCommitsCount() << std::endl;
+    }
 
 
 
