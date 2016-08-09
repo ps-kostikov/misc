@@ -244,6 +244,117 @@ std::map<revision::UserID, VecUserData> getVecReleaseUsers_takeAllRevertedInAcco
     return committedUsers;
 }
 
+std::map<revision::UserID, VecUserData> getVecReleaseUsers_takeAllDeletedInAccount(
+    maps::pgpool3::Pool& pool,
+    revision::DBID sinceBranchId,
+    revision::DBID tillBranchId
+    )
+{
+    INFO() << "Get vec releases users. Since: " << sinceBranchId << " till: " << tillBranchId;
+
+    auto txn = pool.slaveTransaction();
+    revision::BranchManager branchManager(*txn);
+    auto tillBranch = branchManager.load(tillBranchId);
+
+
+    auto commits = revision::Commit::load(
+        *txn,
+        revision::filters::CommitAttr::stableBranchId() > sinceBranchId &&
+        revision::filters::CommitAttr::stableBranchId() <= tillBranchId &&
+        revision::filters::CommitAttr::isTrunk()
+        );
+
+    auto stabilizeCommits = revision::Commit::load(
+        *txn,
+        revision::filters::CommitAttr::stableBranchId() == tillBranchId &&
+        !revision::filters::CommitAttr::isTrunk()
+        );
+
+    revision::DBIDSet revertedCommitIds;   
+    for (const auto& commit: commits) {
+        const auto& curRevertedCommitIds = commit.revertedCommitIds();
+        revertedCommitIds.insert(curRevertedCommitIds.begin(), curRevertedCommitIds.end());
+    }
+    for (const auto& commit: stabilizeCommits) {
+        const auto& curRevertedCommitIds = commit.revertedCommitIds();
+        revertedCommitIds.insert(curRevertedCommitIds.begin(), curRevertedCommitIds.end());
+    }
+
+    revision::DBID maxCommitId = 0;
+    for (const auto& commit: commits) {
+        maxCommitId = std::max(commit.id(), maxCommitId);
+    }
+    for (const auto& commit: stabilizeCommits) {
+        maxCommitId = std::max(commit.id(), maxCommitId);
+    }
+
+    revision::RevisionsGateway rgw(*txn, tillBranch);
+    auto reader = rgw.reader();
+
+    auto allRevisionIds = reader.loadRevisionIds(
+        revision::filters::CommitAttr::stableBranchId() > sinceBranchId &&
+        revision::filters::CommitAttr::stableBranchId() <= tillBranchId);
+
+    std::cout << "all revision ids count = " << allRevisionIds.size() << std::endl;
+
+    auto snapshot = rgw.snapshot(maxCommitId);
+    auto snapshotRevisionIds = snapshot.revisionIdsByFilter(
+        revision::filters::CommitAttr::stableBranchId() > sinceBranchId &&
+        revision::filters::CommitAttr::stableBranchId() <= tillBranchId &&
+        revision::filters::ObjRevAttr::isNotDeleted());
+
+    std::cout << "snapshot revision ids count = " << snapshotRevisionIds.size() << std::endl;
+
+    revision::DBIDSet snapshotObjectIds;
+    for (auto rId: snapshotRevisionIds) {
+        snapshotObjectIds.insert(rId.objectId());
+    }
+    revision::DBIDSet surviveCommitIds;
+    for (auto rId: allRevisionIds) {
+        if (snapshotObjectIds.count(rId.objectId()) > 0) {
+            surviveCommitIds.insert(rId.commitId());
+        }
+    }
+
+    PublicationZone publicationZone(*txn, tillBranch);
+
+    std::map<revision::UserID, VecUserData> committedUsers;
+    CommitsBatch batch;
+    auto processBatch = [&]()
+    {
+        if (batch.empty()) {
+            return;
+        }
+        social::TIds batchCommitIds;
+        for (const auto& commit: batch) {
+            batchCommitIds.insert(commit.id());
+        }
+        auto filteredCommitIds = publicationZone.filterIntersectCommits(batchCommitIds);
+        for (const auto& commit: batch) {
+            if (filteredCommitIds.count(commit.id())) {
+                if (committedUsers.count(commit.createdBy()) == 0) {
+                    committedUsers[commit.createdBy()] = VecUserData(commit.createdBy());
+                }
+                committedUsers[commit.createdBy()].addCommit(commit);
+            }
+        }
+        batch.clear();
+    };
+    for (const auto& commit: commits) {
+        if (revertedCommitIds.count(commit.id()) == 0 && surviveCommitIds.count(commit.id()) > 0) {
+            batch.push_back(commit);
+        }
+        if (batch.size() == BATCH_SIZE) {
+            processBatch();
+        }
+    }
+    processBatch();
+
+    INFO() << "Found " << committedUsers.size() << " unique users";
+    return committedUsers;
+}
+
+
 std::map<revision::UserID, VecUserData> getVecReleaseUsers_onlyLastCommits(
     maps::pgpool3::Pool& pool,
     revision::DBID sinceBranchId,
@@ -298,7 +409,6 @@ std::map<revision::UserID, VecUserData> getVecReleaseUsers_onlyLastCommits(
     auto revisionIds = snapshot.revisionIdsByFilter(
         revision::filters::CommitAttr::stableBranchId() > sinceBranchId &&
         revision::filters::CommitAttr::stableBranchId() <= tillBranchId);
-    // auto revisionIds = snapshot.revisionIdsByFilter(revision::filters::True());
 
     std::cout << "revision id count = " << revisionIds.size() << std::endl;
     revision::DBIDSet snapshotCommitIds;
@@ -306,9 +416,6 @@ std::map<revision::UserID, VecUserData> getVecReleaseUsers_onlyLastCommits(
         snapshotCommitIds.insert(revisionId.commitId());
     }
     std::cout << "snapshot commit ids size = " << snapshotCommitIds.size() << std::endl;
-    // for (auto id: snapshotCommitIds) {
-    //     std::cout << "commit id = " << id << std::endl;
-    // }
 
     CommitsBatch batch;
     auto processBatch = [&]()
