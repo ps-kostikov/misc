@@ -123,6 +123,11 @@ int main(int argc, const char** argv)
         mw::releases_notification::getVecReleaseUsers_takeAllRevertedInAccount(
             *pool, sinceBranchId, tillBranchId),
         exclUids);
+    std::cout << "take all deleted in account:" << std::endl;
+    printStats(
+        mw::releases_notification::getVecReleaseUsers_takeAllDeletedInAccount(
+            *pool, sinceBranchId, tillBranchId),
+        exclUids);
     std::cout << "only snapshot commits:" << std::endl;
     printStats(
         mw::releases_notification::getVecReleaseUsers_onlyLastCommits(

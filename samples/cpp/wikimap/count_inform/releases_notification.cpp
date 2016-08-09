@@ -408,7 +408,8 @@ std::map<revision::UserID, VecUserData> getVecReleaseUsers_onlyLastCommits(
     auto snapshot = rgw.snapshot(maxCommitId);
     auto revisionIds = snapshot.revisionIdsByFilter(
         revision::filters::CommitAttr::stableBranchId() > sinceBranchId &&
-        revision::filters::CommitAttr::stableBranchId() <= tillBranchId);
+        revision::filters::CommitAttr::stableBranchId() <= tillBranchId &&
+        revision::filters::ObjRevAttr::isNotDeleted());
 
     std::cout << "revision id count = " << revisionIds.size() << std::endl;
     revision::DBIDSet snapshotCommitIds;
