@@ -44,6 +44,11 @@ private:
     revision::UserID uid_;
 };
 
+std::map<maps::wiki::revision::UserID, VecUserData> getVecReleaseUsers_withoutReverts(
+    maps::pgpool3::Pool& pool,
+    maps::wiki::revision::DBID sinceBranchId,
+    maps::wiki::revision::DBID tillBranchId);
+
 std::map<maps::wiki::revision::UserID, VecUserData> getVecReleaseUsers_original(
     maps::pgpool3::Pool& pool,
     maps::wiki::revision::DBID sinceBranchId,

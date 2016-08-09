@@ -113,6 +113,11 @@ int main(int argc, const char** argv)
 
     auto exclUids = excludedUids(*pool);
 
+    std::cout << "without reverts:" << std::endl;
+    printStats(
+        mw::releases_notification::getVecReleaseUsers_withoutReverts(
+            *pool, sinceBranchId, tillBranchId),
+        exclUids);
     std::cout << "original:" << std::endl;
     printStats(
         mw::releases_notification::getVecReleaseUsers_original(

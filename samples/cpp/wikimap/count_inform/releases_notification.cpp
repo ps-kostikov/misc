@@ -105,6 +105,63 @@ private:
     social::Gateway socialGateway_;
 };
 
+std::map<revision::UserID, VecUserData> getVecReleaseUsers_withoutReverts(
+    maps::pgpool3::Pool& pool,
+    revision::DBID sinceBranchId,
+    revision::DBID tillBranchId
+    )
+{
+    INFO() << "Get vec releases users. Since: " << sinceBranchId << " till: " << tillBranchId;
+
+    auto txn = pool.slaveTransaction();
+    revision::BranchManager branchManager(*txn);
+
+    std::map<revision::UserID, VecUserData> committedUsers;
+
+    auto commits = revision::Commit::load(
+        *txn,
+        revision::filters::CommitAttr::stableBranchId() > sinceBranchId &&
+        revision::filters::CommitAttr::stableBranchId() <= tillBranchId &&
+        revision::filters::CommitAttr::isTrunk()
+        );
+
+    auto tillBranch = branchManager.load(tillBranchId);
+    PublicationZone publicationZone(*txn, tillBranch);
+
+    CommitsBatch batch;
+    auto processBatch = [&]()
+    {
+        if (batch.empty()) {
+            return;
+        }
+        social::TIds batchCommitIds;
+        for (const auto& commit: batch) {
+            batchCommitIds.insert(commit.id());
+        }
+        auto filteredCommitIds = publicationZone.filterIntersectCommits(batchCommitIds);
+        for (const auto& commit: batch) {
+            if (filteredCommitIds.count(commit.id())) {
+                if (committedUsers.count(commit.createdBy()) == 0) {
+                    committedUsers[commit.createdBy()] = VecUserData(commit.createdBy());
+                }
+                committedUsers[commit.createdBy()].addCommit(commit);
+            }
+        }
+        batch.clear();
+    };
+    for (const auto& commit: commits) {
+        batch.push_back(commit);
+        if (batch.size() == BATCH_SIZE) {
+            processBatch();
+        }
+    }
+    processBatch();
+
+    INFO() << "Found " << committedUsers.size() << " unique users";
+    return committedUsers;
+}
+
+
 std::map<revision::UserID, VecUserData> getVecReleaseUsers_original(
     maps::pgpool3::Pool& pool,
     revision::DBID sinceBranchId,
