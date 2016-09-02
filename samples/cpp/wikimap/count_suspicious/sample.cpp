@@ -48,6 +48,15 @@ public:
     }
 };
 
+struct Action
+{
+    mwr::Commit commit;
+    mwr::ObjectRevision revision;
+};
+
+typedef std::vector<Action> Actions;
+
+
 std::map<mwr::RevisionID, mwr::ObjectRevision> preloadObjectRevisions(
     mwr::RevisionsGateway& rgw, const mwr::RevisionIds& ids)
 {
@@ -84,32 +93,132 @@ std::map<mwr::RevisionID, mwr::ObjectRevision> preloadObjectRevisions(
     return result;
 }
 
-// void researchRevisionId(mwr::RevisionsGateway& rgw, const mwr::RevisionID& revisionId)
-void researchRevisionId(
-    mwr::ObjectRevision& revision,
-    mwr::ObjectRevision& prevRevision,
-    mwr::ObjectRevision& originalRevision)
+std::map<mwr::DBID, mwr::Commit> preloadCommits(
+    mwr::RevisionsGateway& rgw, const mwr::RevisionIds& ids)
 {
-    std::string attrName = "rd_el:speed_limit";
+    mwr::DBID maxCommitId = ids[0].commitId();
+    for (const auto& id: ids) {
+        maxCommitId = std::max(maxCommitId, id.commitId());
+    }
+    mwr::DBID minCommitId = ids[0].commitId();
+    for (const auto& id: ids) {
+        minCommitId = std::min(minCommitId, id.commitId());
+    }
+    auto commits = mwr::Commit::load(
+        rgw.work(),
+        mwr::filters::CommitAttr::id() <= maxCommitId &&
+        mwr::filters::CommitAttr::id() >= minCommitId);
+
+    std::map<mwr::DBID, mwr::Commit> result;
+    for (const auto& commit: commits) {
+        result.emplace(commit.id(), commit);
+    }
+    return result;
+}
+
+std::vector<Actions> loadActionChains(mwr::RevisionsGateway& rgw, const mwr::RevisionIds& ids)
+{
+    auto revisionMap = preloadObjectRevisions(rgw, ids);
+    auto commitMap = preloadCommits(rgw, ids);
+
+    std::vector<Actions> result;
+    for (auto id: ids) {
+        Actions actions;
+
+        auto& revision = revisionMap.at(id);
+        if (revisionMap.count(revision.prevId()) == 0) {
+            continue;
+        }
+        auto& prevRevision = revisionMap.at(revision.prevId());
+        if (revisionMap.count(prevRevision.prevId()) == 0) {
+            continue;
+        }
+        auto& originalRevision = revisionMap.at(prevRevision.prevId());
+
+        if (commitMap.count(revision.id().commitId()) == 0) {
+            continue;
+        }
+        if (commitMap.count(prevRevision.id().commitId()) == 0) {
+            continue;
+        }
+        if (commitMap.count(originalRevision.id().commitId()) == 0) {
+            continue;
+        }
+
+        auto commit = commitMap.at(revision.id().commitId());
+        auto prevCommit = commitMap.at(prevRevision.id().commitId());
+        auto originalCommit = commitMap.at(originalRevision.id().commitId());
+
+        actions.push_back(Action{commit, revision});
+        actions.push_back(Action{prevCommit, prevRevision});
+        actions.push_back(Action{originalCommit, originalRevision});
+
+        result.emplace_back(actions);
+    }
+    return result;
+}
+
+
+bool isSuspicious(const Actions& actions)
+{
+    if (actions.size() < 3) {
+        return false;
+    }
+
+    const std::string attrName = "rd_el:speed_limit";
     // std::string attrName = "rd_el:speed_cat";
-    for (auto& r: {revision, prevRevision, originalRevision}) {
+
+    const auto& action = actions[0];
+    const auto& prevAction = actions[1];
+    const auto& originalAction = actions[2];
+
+    for (auto& r: {action.revision, prevAction.revision, originalAction.revision}) {
         if (r.data().attributes->count(attrName) == 0) {
-            return;
+            return false;
         }
     }
-    auto speedCat = revision.data().attributes->at(attrName);
-    auto prevSpeedCat = prevRevision.data().attributes->at(attrName);
-    auto originalSpeedCat = originalRevision.data().attributes->at(attrName);
-    if (speedCat != prevSpeedCat and speedCat == originalSpeedCat) {
-        std::cout << "commit id = " << revision.id().commitId()
-            << "; obj revision id = " << revision.id().objectId() << std::endl;
 
-        std::cout << "speed cat: " << speedCat << std::endl;
-        std::cout << "prev speed cat: " << prevSpeedCat << std::endl;
-        std::cout << std::endl;
+    if (action.commit.createdBy() == prevAction.commit.createdBy()) {
+        return false;
     }
 
+    auto attr = action.revision.data().attributes->at(attrName);
+    auto prevAttr = prevAction.revision.data().attributes->at(attrName);
+    auto originalAttr = originalAction.revision.data().attributes->at(attrName);
+    if (attr != prevAttr and attr == originalAttr) {
+        return true;
+    }
+
+    return false;
 }
+
+
+// void researchRevisionId(mwr::RevisionsGateway& rgw, const mwr::RevisionID& revisionId)
+// void researchRevisionId(
+//     mwr::ObjectRevision& revision,
+//     mwr::ObjectRevision& prevRevision,
+//     mwr::ObjectRevision& originalRevision)
+// {
+//     std::string attrName = "rd_el:speed_limit";
+//     // std::string attrName = "rd_el:speed_cat";
+//     for (auto& r: {revision, prevRevision, originalRevision}) {
+//         if (r.data().attributes->count(attrName) == 0) {
+//             return;
+//         }
+//     }
+//     auto speedCat = revision.data().attributes->at(attrName);
+//     auto prevSpeedCat = prevRevision.data().attributes->at(attrName);
+//     auto originalSpeedCat = originalRevision.data().attributes->at(attrName);
+//     if (speedCat != prevSpeedCat and speedCat == originalSpeedCat) {
+//         std::cout << "commit id = " << revision.id().commitId()
+//             << "; obj revision id = " << revision.id().objectId() << std::endl;
+
+//         std::cout << "speed cat: " << speedCat << std::endl;
+//         std::cout << "prev speed cat: " << prevSpeedCat << std::endl;
+//         std::cout << std::endl;
+//     }
+
+// }
 
 void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchId)
 {
@@ -140,26 +249,62 @@ void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchI
         mwr::filters::CommitAttr::stableBranchId() <= tillBranchId &&
         mwr::filters::ObjRevAttr::isNotDeleted() &&
         mwr::filters::Attr("cat:rd_el").defined() && 
-        mwr::filters::CommitAttr("created_by").in(uids) &&
-        mwr::filters::CommitAttribute("action").equals("commit-reverted"));
+        mwr::filters::CommitAttr("created_by").in(uids) /*&&
+        mwr::filters::CommitAttribute("action").equals("commit-reverted")*/);
     std::cout << "revision ids size = " << revisionIds.size() << std::endl;
 
-    auto revisionMap = preloadObjectRevisions(rgw, revisionIds);
+    auto chains = loadActionChains(rgw, revisionIds);
+    std::cout << "num of chains = " << chains.size() << std::endl;
 
-    // int limit = std::min(static_cast<int>(revisionIds.size()), 20);
-    int limit = static_cast<int>(revisionIds.size());
-    for (int i = 0; i < limit; ++i) {
-        auto& revision = revisionMap.at(revisionIds[i]);
-        if (revisionMap.count(revision.prevId()) == 0) {
-            continue;
+    Actions suspiciousActions;
+    for (const auto& chain: chains) {
+        if (isSuspicious(chain)) {
+            suspiciousActions.push_back(chain[0]);
         }
-        auto& prevRevision = revisionMap.at(revision.prevId());
-        if (revisionMap.count(prevRevision.prevId()) == 0) {
-            continue;
-        }
-        auto& originalRevision = revisionMap.at(prevRevision.prevId());
-        researchRevisionId(revision, prevRevision, originalRevision);
     }
+    std::cout << "num of suspicious actions = " << suspiciousActions.size() << std::endl;
+
+    std::map<mwr::UserID, int> userCounts;
+    for (const auto& action: suspiciousActions) {
+        userCounts[action.commit.createdBy()] += 1;
+    }
+
+    std::sort(suspiciousActions.begin(), suspiciousActions.end(), [&userCounts](const Action& left, const Action& right) {
+        auto leftAuthor = left.commit.createdBy();
+        auto rightAuthor = right.commit.createdBy();
+
+        auto leftCount = userCounts[leftAuthor];
+        auto rightCount = userCounts[rightAuthor];
+
+        if (leftCount != rightCount) {
+            return leftCount > rightCount;
+        }
+        return leftAuthor < rightAuthor;
+    });
+
+    for (const auto& action: suspiciousActions) {
+        std::cout << "user id = " << action.commit.createdBy()
+            << "; commit id = " << action.revision.id().commitId()
+            << "; object id = " << action.revision.id().objectId()
+            << std::endl;
+    }
+
+    // auto revisionMap = preloadObjectRevisions(rgw, revisionIds);
+
+    // // int limit = std::min(static_cast<int>(revisionIds.size()), 20);
+    // int limit = static_cast<int>(revisionIds.size());
+    // for (int i = 0; i < limit; ++i) {
+    //     auto& revision = revisionMap.at(revisionIds[i]);
+    //     if (revisionMap.count(revision.prevId()) == 0) {
+    //         continue;
+    //     }
+    //     auto& prevRevision = revisionMap.at(revision.prevId());
+    //     if (revisionMap.count(prevRevision.prevId()) == 0) {
+    //         continue;
+    //     }
+    //     auto& originalRevision = revisionMap.at(prevRevision.prevId());
+    //     researchRevisionId(revision, prevRevision, originalRevision);
+    // }
 
   
 
