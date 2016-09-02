@@ -111,13 +111,10 @@ void researchRevisionId(
 
 }
 
-void evalSomething(maps::pgpool3::Pool& pool)
+void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchId)
 {
     auto txn = pool.slaveTransaction();
     mwr::BranchManager branchManager(*txn);
-
-    int sinceBranchId = 145;
-    int tillBranchId = 146;
 
     auto tillBranch = branchManager.load(tillBranchId);
     mwr::RevisionsGateway rgw(*txn, tillBranch);
@@ -143,8 +140,8 @@ void evalSomething(maps::pgpool3::Pool& pool)
         mwr::filters::CommitAttr::stableBranchId() <= tillBranchId &&
         mwr::filters::ObjRevAttr::isNotDeleted() &&
         mwr::filters::Attr("cat:rd_el").defined() && 
-        mwr::filters::CommitAttr("created_by").in(uids) /*&&
-        mwr::filters::CommitAttribute("action").equals("commit-reverted")*/);
+        mwr::filters::CommitAttr("created_by").in(uids) &&
+        mwr::filters::CommitAttribute("action").equals("commit-reverted"));
     std::cout << "revision ids size = " << revisionIds.size() << std::endl;
 
     auto revisionMap = preloadObjectRevisions(rgw, revisionIds);
@@ -200,12 +197,14 @@ int main(int argc, const char** argv)
 
     std::cout << "hello" << std::endl;
     std::cout << "argc = " << argc << std::endl;
-    if (argc < 2) {
-        std::cout << "expected cmd line: ./<exe> <connection string>" << std::endl;
+    if (argc < 4) {
+        std::cout << "expected cmd line: ./<exe> <connection string> <since branch> <till branch" << std::endl;
         return 1;
     }
 
     std::string connStr(argv[1]);
+    int sinceBranchId = std::stoi(argv[2]);
+    int tillBranchId = std::stoi(argv[3]);
 
     std::cout << "connection string = '" << connStr << "'" << std::endl;
     mpgp::PoolConfigurationPtr poolConfiguration(mpgp::PoolConfiguration::create());
@@ -223,7 +222,7 @@ int main(int argc, const char** argv)
         std::move(poolConstants)
     ));
 
-    evalSomething(*pool);
+    evalSomething(*pool, sinceBranchId, tillBranchId);
 
     return 0;
 }
