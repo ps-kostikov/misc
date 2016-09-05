@@ -159,13 +159,13 @@ std::vector<Actions> loadActionChains(mwr::RevisionsGateway& rgw, const mwr::Rev
 }
 
 
-bool isSuspicious(const Actions& actions)
+bool isSuspicious(const Actions& actions, const std::string& attrName)
 {
     if (actions.size() < 3) {
         return false;
     }
 
-    const std::string attrName = "rd_el:speed_limit";
+    // const std::string attrName = "rd_el:speed_limit";
     // std::string attrName = "rd_el:speed_cat";
 
     const auto& action = actions[0];
@@ -220,7 +220,7 @@ bool isSuspicious(const Actions& actions)
 
 // }
 
-void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchId)
+void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchId, const std::string& attrName)
 {
     auto txn = pool.slaveTransaction();
     mwr::BranchManager branchManager(*txn);
@@ -258,7 +258,7 @@ void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchI
 
     Actions suspiciousActions;
     for (const auto& chain: chains) {
-        if (isSuspicious(chain)) {
+        if (isSuspicious(chain, attrName)) {
             suspiciousActions.push_back(chain[0]);
         }
     }
@@ -268,6 +268,20 @@ void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchI
     for (const auto& action: suspiciousActions) {
         userCounts[action.commit.createdBy()] += 1;
     }
+
+    std::vector<std::pair<mwr::UserID, int>> usersWithCounts;
+    for (auto it = userCounts.begin(); it != userCounts.end(); ++it) {
+        usersWithCounts.push_back(std::pair<mwr::UserID, int>{it->first, it->second});
+    }
+    std::sort(usersWithCounts.begin(), usersWithCounts.end(), [](const std::pair<mwr::UserID, int>& left, const std::pair<mwr::UserID, int>& right){
+        return left.second < right.second;
+    });
+
+    std::cout << "moderators top:" << std::endl;
+    for (auto it = usersWithCounts.rbegin(); it != usersWithCounts.rend(); ++it) {
+        std::cout << "user id = " << it->first << "; num of corrections = " << it->second << std::endl;
+    }
+    std::cout << std::endl;
 
     std::sort(suspiciousActions.begin(), suspiciousActions.end(), [&userCounts](const Action& left, const Action& right) {
         auto leftAuthor = left.commit.createdBy();
@@ -342,14 +356,15 @@ int main(int argc, const char** argv)
 
     std::cout << "hello" << std::endl;
     std::cout << "argc = " << argc << std::endl;
-    if (argc < 4) {
-        std::cout << "expected cmd line: ./<exe> <connection string> <since branch> <till branch" << std::endl;
+    if (argc < 5) {
+        std::cout << "expected cmd line: ./<exe> <connection string> <since branch> <till branch> <attr name>" << std::endl;
         return 1;
     }
 
     std::string connStr(argv[1]);
     int sinceBranchId = std::stoi(argv[2]);
     int tillBranchId = std::stoi(argv[3]);
+    std::string attrName(argv[4]);
 
     std::cout << "connection string = '" << connStr << "'" << std::endl;
     mpgp::PoolConfigurationPtr poolConfiguration(mpgp::PoolConfiguration::create());
@@ -367,7 +382,7 @@ int main(int argc, const char** argv)
         std::move(poolConstants)
     ));
 
-    evalSomething(*pool, sinceBranchId, tillBranchId);
+    evalSomething(*pool, sinceBranchId, tillBranchId, attrName);
 
     return 0;
 }
