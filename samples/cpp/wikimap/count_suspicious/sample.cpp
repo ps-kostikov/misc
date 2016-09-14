@@ -165,9 +165,6 @@ bool isSuspicious(const Actions& actions, const std::string& attrName)
         return false;
     }
 
-    // const std::string attrName = "rd_el:speed_limit";
-    // std::string attrName = "rd_el:speed_cat";
-
     const auto& action = actions[0];
     const auto& prevAction = actions[1];
     const auto& originalAction = actions[2];
@@ -191,34 +188,6 @@ bool isSuspicious(const Actions& actions, const std::string& attrName)
 
     return false;
 }
-
-
-// void researchRevisionId(mwr::RevisionsGateway& rgw, const mwr::RevisionID& revisionId)
-// void researchRevisionId(
-//     mwr::ObjectRevision& revision,
-//     mwr::ObjectRevision& prevRevision,
-//     mwr::ObjectRevision& originalRevision)
-// {
-//     std::string attrName = "rd_el:speed_limit";
-//     // std::string attrName = "rd_el:speed_cat";
-//     for (auto& r: {revision, prevRevision, originalRevision}) {
-//         if (r.data().attributes->count(attrName) == 0) {
-//             return;
-//         }
-//     }
-//     auto speedCat = revision.data().attributes->at(attrName);
-//     auto prevSpeedCat = prevRevision.data().attributes->at(attrName);
-//     auto originalSpeedCat = originalRevision.data().attributes->at(attrName);
-//     if (speedCat != prevSpeedCat and speedCat == originalSpeedCat) {
-//         std::cout << "commit id = " << revision.id().commitId()
-//             << "; obj revision id = " << revision.id().objectId() << std::endl;
-
-//         std::cout << "speed cat: " << speedCat << std::endl;
-//         std::cout << "prev speed cat: " << prevSpeedCat << std::endl;
-//         std::cout << std::endl;
-//     }
-
-// }
 
 void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchId, const std::string& attrName)
 {
@@ -302,51 +271,6 @@ void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchI
             << "; object id = " << action.revision.id().objectId()
             << std::endl;
     }
-
-    // auto revisionMap = preloadObjectRevisions(rgw, revisionIds);
-
-    // // int limit = std::min(static_cast<int>(revisionIds.size()), 20);
-    // int limit = static_cast<int>(revisionIds.size());
-    // for (int i = 0; i < limit; ++i) {
-    //     auto& revision = revisionMap.at(revisionIds[i]);
-    //     if (revisionMap.count(revision.prevId()) == 0) {
-    //         continue;
-    //     }
-    //     auto& prevRevision = revisionMap.at(revision.prevId());
-    //     if (revisionMap.count(prevRevision.prevId()) == 0) {
-    //         continue;
-    //     }
-    //     auto& originalRevision = revisionMap.at(prevRevision.prevId());
-    //     researchRevisionId(revision, prevRevision, originalRevision);
-    // }
-
-  
-
-
-    // auto commits = mwr::Commit::load(
-    //     *txn,
-    //     mwr::filters::CommitAttr::stableBranchId() > sinceBranchId &&
-    //     mwr::filters::CommitAttr::stableBranchId() <= tillBranchId &&
-    //     mwr::filters::CommitAttr::isTrunk()
-    //     );
-    // std::cout << "commit size = " << commits.size() << std::endl;
-
-    // mwr::DBID maxCommitId = 0;
-    // for (const auto& commit: commits) {
-    //     maxCommitId = std::max(commit.id(), maxCommitId);
-    // }
-    // std::cout << "max commit id = " << maxCommitId << std::endl;
-
-    // auto tillBranch = branchManager.load(tillBranchId);
-    // mwr::RevisionsGateway rgw(*txn, tillBranch);
-    // auto snapshot = rgw.snapshot(maxCommitId);
-    // auto revisionIds = snapshot.revisionIdsByFilter(
-    //     mwr::filters::CommitAttr::stableBranchId() > sinceBranchId &&
-    //     mwr::filters::CommitAttr::stableBranchId() <= tillBranchId &&
-    //     mwr::filters::ObjRevAttr::isNotDeleted());
-
-    // std::cout << "revision ids size = " << revisionIds.size() << std::endl;
-
 }
 
 
