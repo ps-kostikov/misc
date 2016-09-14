@@ -55,6 +55,8 @@ struct Action
 };
 
 typedef std::vector<Action> Actions;
+typedef std::vector<Action> ActionChain;
+typedef std::vector<ActionChain> ActionChains;
 
 
 std::map<mwr::RevisionID, mwr::ObjectRevision> preloadObjectRevisions(
@@ -116,14 +118,14 @@ std::map<mwr::DBID, mwr::Commit> preloadCommits(
     return result;
 }
 
-std::vector<Actions> loadActionChains(mwr::RevisionsGateway& rgw, const mwr::RevisionIds& ids)
+ActionChains loadActionChains(mwr::RevisionsGateway& rgw, const mwr::RevisionIds& ids)
 {
     auto revisionMap = preloadObjectRevisions(rgw, ids);
     auto commitMap = preloadCommits(rgw, ids);
 
-    std::vector<Actions> result;
+    ActionChains result;
     for (auto id: ids) {
-        Actions actions;
+        ActionChain chain;
 
         auto& revision = revisionMap.at(id);
         if (revisionMap.count(revision.prevId()) == 0) {
@@ -149,25 +151,25 @@ std::vector<Actions> loadActionChains(mwr::RevisionsGateway& rgw, const mwr::Rev
         auto prevCommit = commitMap.at(prevRevision.id().commitId());
         auto originalCommit = commitMap.at(originalRevision.id().commitId());
 
-        actions.push_back(Action{commit, revision});
-        actions.push_back(Action{prevCommit, prevRevision});
-        actions.push_back(Action{originalCommit, originalRevision});
+        chain.push_back(Action{commit, revision});
+        chain.push_back(Action{prevCommit, prevRevision});
+        chain.push_back(Action{originalCommit, originalRevision});
 
-        result.emplace_back(actions);
+        result.emplace_back(chain);
     }
     return result;
 }
 
 
-bool isSuspicious(const Actions& actions, const std::string& attrName)
+bool isSuspicious(const ActionChain& chain, const std::string& attrName)
 {
-    if (actions.size() < 3) {
+    if (chain.size() < 3) {
         return false;
     }
 
-    const auto& action = actions[0];
-    const auto& prevAction = actions[1];
-    const auto& originalAction = actions[2];
+    const auto& action = chain[0];
+    const auto& prevAction = chain[1];
+    const auto& originalAction = chain[2];
 
     for (auto& r: {action.revision, prevAction.revision, originalAction.revision}) {
         if (r.data().attributes->count(attrName) == 0) {
@@ -187,6 +189,102 @@ bool isSuspicious(const Actions& actions, const std::string& attrName)
     }
 
     return false;
+}
+
+
+void printSuspicousChains(const ActionChains& suspiciousChains)
+{
+    Actions suspiciousActions;
+    for (const auto& chain: suspiciousChains) {
+        suspiciousActions.push_back(chain[0]);
+    }
+
+
+    std::cout << "num of suspicious actions = " << suspiciousActions.size() << std::endl;
+
+    std::map<mwr::UserID, int> userCounts;
+    for (const auto& action: suspiciousActions) {
+        userCounts[action.commit.createdBy()] += 1;
+    }
+
+    std::vector<std::pair<mwr::UserID, int>> usersWithCounts;
+    for (auto it = userCounts.begin(); it != userCounts.end(); ++it) {
+        usersWithCounts.push_back(std::pair<mwr::UserID, int>{it->first, it->second});
+    }
+    std::sort(usersWithCounts.begin(), usersWithCounts.end(), [](const std::pair<mwr::UserID, int>& left, const std::pair<mwr::UserID, int>& right){
+        return left.second < right.second;
+    });
+
+    std::cout << "moderators top:" << std::endl;
+    for (auto it = usersWithCounts.rbegin(); it != usersWithCounts.rend(); ++it) {
+        std::cout << "user id = " << it->first << "; num of corrections = " << it->second << std::endl;
+    }
+    std::cout << std::endl;
+
+    auto actionsCopy = suspiciousActions;
+    std::sort(actionsCopy.begin(), actionsCopy.end(), [&userCounts](const Action& left, const Action& right) {
+        auto leftAuthor = left.commit.createdBy();
+        auto rightAuthor = right.commit.createdBy();
+
+        auto leftCount = userCounts[leftAuthor];
+        auto rightCount = userCounts[rightAuthor];
+
+        if (leftCount != rightCount) {
+            return leftCount > rightCount;
+        }
+        return leftAuthor < rightAuthor;
+    });
+
+    for (const auto& action: actionsCopy) {
+        std::cout << "user id = " << action.commit.createdBy()
+            << "; commit id = " << action.revision.id().commitId()
+            << "; object id = " << action.revision.id().objectId()
+            << std::endl;
+    }
+
+}
+
+struct SeparatedSuspiciousChains
+{
+    ActionChains revertWithEvent;
+    ActionChains editWithEvent;
+    ActionChains revertWithoutEvent;
+    ActionChains editWithoutEvent;
+};
+
+SeparatedSuspiciousChains
+separateChains(const ActionChains& chains, maps::wiki::social::Gateway& sgw)
+{
+    auto isRevert = [](const ActionChain& chain) {
+        const auto& commitAttrs = chain[0].commit.attributes();
+        if (commitAttrs.count("action")) {
+            return commitAttrs.at("action") == "commit-reverted";
+        }
+        return false;
+    };
+    auto isWithEvent = [&](const ActionChain& chain) {
+        auto prevCommitId = chain[1].commit.id();
+        auto tasks = sgw.loadEditTasksByCommitIds({prevCommitId});
+        return !tasks.empty();
+    };
+
+    SeparatedSuspiciousChains result;
+    for (const auto& chain: chains) {
+        if (isRevert(chain)) {
+            if (isWithEvent(chain)) {
+                result.revertWithEvent.push_back(chain);
+            } else {
+                result.revertWithoutEvent.push_back(chain);
+            }
+        } else {
+            if (isWithEvent(chain)) {
+                result.editWithEvent.push_back(chain);
+            } else {
+                result.editWithoutEvent.push_back(chain);
+            }
+        }
+    }
+    return result;
 }
 
 void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchId, const std::string& attrName)
@@ -225,52 +323,35 @@ void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchI
     auto chains = loadActionChains(rgw, revisionIds);
     std::cout << "num of chains = " << chains.size() << std::endl;
 
-    Actions suspiciousActions;
+    ActionChains suspicionsChains;
     for (const auto& chain: chains) {
         if (isSuspicious(chain, attrName)) {
-            suspiciousActions.push_back(chain[0]);
+            suspicionsChains.push_back(chain);
         }
     }
-    std::cout << "num of suspicious actions = " << suspiciousActions.size() << std::endl;
 
-    std::map<mwr::UserID, int> userCounts;
-    for (const auto& action: suspiciousActions) {
-        userCounts[action.commit.createdBy()] += 1;
-    }
+    maps::wiki::social::Gateway sgw(*txn);
+    auto separatedChains = separateChains(suspicionsChains, sgw);
 
-    std::vector<std::pair<mwr::UserID, int>> usersWithCounts;
-    for (auto it = userCounts.begin(); it != userCounts.end(); ++it) {
-        usersWithCounts.push_back(std::pair<mwr::UserID, int>{it->first, it->second});
-    }
-    std::sort(usersWithCounts.begin(), usersWithCounts.end(), [](const std::pair<mwr::UserID, int>& left, const std::pair<mwr::UserID, int>& right){
-        return left.second < right.second;
-    });
-
-    std::cout << "moderators top:" << std::endl;
-    for (auto it = usersWithCounts.rbegin(); it != usersWithCounts.rend(); ++it) {
-        std::cout << "user id = " << it->first << "; num of corrections = " << it->second << std::endl;
-    }
+    std::cout << "reverts with event:" << std::endl;
+    printSuspicousChains(separatedChains.revertWithEvent);
+    std::cout << "====================" << std::endl;
     std::cout << std::endl;
 
-    std::sort(suspiciousActions.begin(), suspiciousActions.end(), [&userCounts](const Action& left, const Action& right) {
-        auto leftAuthor = left.commit.createdBy();
-        auto rightAuthor = right.commit.createdBy();
+    std::cout << "reverts without event:" << std::endl;
+    printSuspicousChains(separatedChains.revertWithoutEvent);
+    std::cout << "====================" << std::endl;
+    std::cout << std::endl;
 
-        auto leftCount = userCounts[leftAuthor];
-        auto rightCount = userCounts[rightAuthor];
+    std::cout << "edits with event:" << std::endl;
+    printSuspicousChains(separatedChains.editWithEvent);
+    std::cout << "====================" << std::endl;
+    std::cout << std::endl;
 
-        if (leftCount != rightCount) {
-            return leftCount > rightCount;
-        }
-        return leftAuthor < rightAuthor;
-    });
-
-    for (const auto& action: suspiciousActions) {
-        std::cout << "user id = " << action.commit.createdBy()
-            << "; commit id = " << action.revision.id().commitId()
-            << "; object id = " << action.revision.id().objectId()
-            << std::endl;
-    }
+    std::cout << "edits without event:" << std::endl;
+    printSuspicousChains(separatedChains.editWithoutEvent);
+    std::cout << "====================" << std::endl;
+    std::cout << std::endl;
 }
 
 
