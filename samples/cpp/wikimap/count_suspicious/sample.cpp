@@ -65,10 +65,14 @@ std::map<mwr::RevisionID, mwr::ObjectRevision> preloadObjectRevisions(
     auto reader = rgw.reader();
     auto revisions = reader.loadRevisions(ids);
 
+    int chainTeardownCount = 0;
+
     mwr::RevisionIds prevIds;
     for (const auto& revision: revisions) {
         if (!revision.prevId().empty()) {
             prevIds.push_back(revision.prevId());
+        } else {
+            ++chainTeardownCount;
         }
     }
     auto prevRevisions = reader.loadRevisions(prevIds);
@@ -77,6 +81,8 @@ std::map<mwr::RevisionID, mwr::ObjectRevision> preloadObjectRevisions(
     for (const auto& revision: prevRevisions) {
         if (!revision.prevId().empty()) {
             originalIds.push_back(revision.prevId());
+        } else {
+            ++chainTeardownCount;
         }
     }
     auto originalRevisions = reader.loadRevisions(originalIds);
@@ -92,36 +98,43 @@ std::map<mwr::RevisionID, mwr::ObjectRevision> preloadObjectRevisions(
     for (const auto& revision: originalRevisions) {
         result.emplace(revision.id(), revision);
     }
+
+    std::cout << "chain teardown count = " << chainTeardownCount << std::endl;
     return result;
 }
 
 std::map<mwr::DBID, mwr::Commit> preloadCommits(
-    mwr::RevisionsGateway& rgw, const mwr::RevisionIds& ids)
+    mwr::RevisionsGateway& rgw, const mwr::Revisions& revisions)
 {
-    mwr::DBID maxCommitId = ids[0].commitId();
-    for (const auto& id: ids) {
-        maxCommitId = std::max(maxCommitId, id.commitId());
+    std::vector<mwr::DBID> commitIdsToLoad;
+    for (const auto& revision: revisions) {
+        commitIdsToLoad.push_back(revision.id().commitId());
     }
-    mwr::DBID minCommitId = ids[0].commitId();
-    for (const auto& id: ids) {
-        minCommitId = std::min(minCommitId, id.commitId());
-    }
+
     auto commits = mwr::Commit::load(
         rgw.work(),
-        mwr::filters::CommitAttr::id() <= maxCommitId &&
-        mwr::filters::CommitAttr::id() >= minCommitId);
+        mwr::filters::CommitAttr::id().in(commitIdsToLoad));
 
     std::map<mwr::DBID, mwr::Commit> result;
     for (const auto& commit: commits) {
         result.emplace(commit.id(), commit);
     }
     return result;
+
 }
+
 
 ActionChains loadActionChains(mwr::RevisionsGateway& rgw, const mwr::RevisionIds& ids)
 {
     auto revisionMap = preloadObjectRevisions(rgw, ids);
-    auto commitMap = preloadCommits(rgw, ids);
+    mwr::Revisions revisions;
+    for (const auto& p: revisionMap) {
+        revisions.push_back(p.second);
+    }
+    auto commitMap = preloadCommits(rgw, revisions);
+
+    int revisionMissCount = 0;
+    int commitMissCount = 0;
 
     ActionChains result;
     for (auto id: ids) {
@@ -129,21 +142,26 @@ ActionChains loadActionChains(mwr::RevisionsGateway& rgw, const mwr::RevisionIds
 
         auto& revision = revisionMap.at(id);
         if (revisionMap.count(revision.prevId()) == 0) {
+            ++revisionMissCount;
             continue;
         }
         auto& prevRevision = revisionMap.at(revision.prevId());
         if (revisionMap.count(prevRevision.prevId()) == 0) {
+            ++revisionMissCount;
             continue;
         }
         auto& originalRevision = revisionMap.at(prevRevision.prevId());
 
         if (commitMap.count(revision.id().commitId()) == 0) {
+            ++commitMissCount;
             continue;
         }
         if (commitMap.count(prevRevision.id().commitId()) == 0) {
+            ++commitMissCount;
             continue;
         }
         if (commitMap.count(originalRevision.id().commitId()) == 0) {
+            ++commitMissCount;
             continue;
         }
 
@@ -157,6 +175,8 @@ ActionChains loadActionChains(mwr::RevisionsGateway& rgw, const mwr::RevisionIds
 
         result.emplace_back(chain);
     }
+    std::cout << "revision miss count = " << revisionMissCount << std::endl;
+    std::cout << "commit miss count = " << commitMissCount << std::endl;
     return result;
 }
 
