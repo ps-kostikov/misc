@@ -181,7 +181,10 @@ ActionChains loadActionChains(mwr::RevisionsGateway& rgw, const mwr::RevisionIds
 }
 
 
-bool isSuspicious(const ActionChain& chain, const std::string& attrName)
+bool isSuspicious(
+    const ActionChain& chain,
+    const std::set<mw::social::TUid>& moderatorUids,
+    const std::string& attrName)
 {
     if (chain.size() < 3) {
         return false;
@@ -190,6 +193,10 @@ bool isSuspicious(const ActionChain& chain, const std::string& attrName)
     const auto& action = chain[0];
     const auto& prevAction = chain[1];
     const auto& originalAction = chain[2];
+
+    if (moderatorUids.count(prevAction.commit.createdBy())) {
+        return false;
+    }
 
     for (auto& r: {action.revision, prevAction.revision, originalAction.revision}) {
         if (r.data().attributes->count(attrName) == 0) {
@@ -307,6 +314,29 @@ separateChains(const ActionChains& chains, maps::wiki::social::Gateway& sgw)
     return result;
 }
 
+std::set<mw::social::TUid> uidsFromRole(
+    maps::wiki::acl::ACLGateway& agw,
+    const std::string& roleName)
+{
+    auto role = agw.role(roleName);
+    auto pagedUserVector = agw.users(0, role.id(), 0, boost::none, 0, 0);
+    std::set<mw::social::TUid> result;
+    for (const auto& user: pagedUserVector.value()) {
+        result.insert(user.uid());
+    }
+    return result;
+}
+
+std::set<mw::social::TUid> allModeratorUids(maps::wiki::acl::ACLGateway& agw)
+{
+    auto moderatorUids = uidsFromRole(agw, "moderator");
+    auto yandexModeratorUids = uidsFromRole(agw, "yandex-moderator");
+    std::set<mw::social::TUid> result;
+    result.insert(moderatorUids.begin(), moderatorUids.end());
+    result.insert(yandexModeratorUids.begin(), yandexModeratorUids.end());
+    return result;
+}
+
 void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchId, const std::string& attrName)
 {
     auto txn = pool.slaveTransaction();
@@ -321,14 +351,9 @@ void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchI
 
     maps::wiki::acl::ACLGateway agw(*txn);
 
-    auto role = agw.role("moderator");
-    auto pagedUserVector = agw.users(0, role.id(), 0, boost::none, 0, 0);
-    std::vector<mw::social::TUid> uids;
-    for (const auto& user: pagedUserVector.value()) {
-        uids.push_back(user.uid());
-    }
+    auto moderatorUids = allModeratorUids(agw);
 
-    std::cout << "uids size = " << uids.size() << std::endl;
+    std::cout << "moderator uids size = " << moderatorUids.size() << std::endl;
 
 
     auto revisionIds = reader.loadRevisionIds(
@@ -337,7 +362,7 @@ void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchI
         mwr::filters::CommitAttr::stableBranchId() <= tillBranchId &&
         mwr::filters::ObjRevAttr::isNotDeleted() &&
         mwr::filters::Attr("cat:rd_el").defined() && 
-        mwr::filters::CommitAttr("created_by").in(uids) /*&&
+        mwr::filters::CommitAttr("created_by").in(moderatorUids) /*&&
         mwr::filters::CommitAttribute("action").equals("commit-reverted")*/);
     std::cout << "revision ids size = " << revisionIds.size() << std::endl;
 
@@ -346,7 +371,7 @@ void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchI
 
     ActionChains suspicionsChains;
     for (const auto& chain: chains) {
-        if (isSuspicious(chain, attrName)) {
+        if (isSuspicious(chain, moderatorUids, attrName)) {
             suspicionsChains.push_back(chain);
         }
     }
