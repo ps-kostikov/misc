@@ -312,6 +312,7 @@ void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchI
 
 
     auto revisionIds = reader.loadRevisionIds(
+        mwr::filters::CommitAttr::isTrunk() &&
         mwr::filters::CommitAttr::stableBranchId() > sinceBranchId &&
         mwr::filters::CommitAttr::stableBranchId() <= tillBranchId &&
         mwr::filters::ObjRevAttr::isNotDeleted() &&
