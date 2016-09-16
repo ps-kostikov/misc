@@ -19,6 +19,8 @@
 #include <yandex/maps/wiki/common/date_time.h>
 #include <yandex/maps/wiki/common/paged_result.h>
 
+#include <boost/algorithm/string/split.hpp>
+
 #include <iostream>
 #include <string>
 
@@ -184,7 +186,7 @@ ActionChains loadActionChains(mwr::RevisionsGateway& rgw, const mwr::RevisionIds
 bool isSuspicious(
     const ActionChain& chain,
     const std::set<mw::social::TUid>& moderatorUids,
-    const std::string& attrName)
+    const std::vector<std::string>& attrNames)
 {
     if (chain.size() < 3) {
         return false;
@@ -198,21 +200,31 @@ bool isSuspicious(
         return false;
     }
 
-    for (auto& r: {action.revision, prevAction.revision, originalAction.revision}) {
-        if (r.data().attributes->count(attrName) == 0) {
-            return false;
-        }
-    }
-
     if (action.commit.createdBy() == prevAction.commit.createdBy()) {
         return false;
     }
 
-    auto attr = action.revision.data().attributes->at(attrName);
-    auto prevAttr = prevAction.revision.data().attributes->at(attrName);
-    auto originalAttr = originalAction.revision.data().attributes->at(attrName);
-    if (attr != prevAttr and attr == originalAttr) {
-        return true;
+
+    auto suspiciousByAttr = [&](const std::string& attrName) {
+        for (auto& r: {action.revision, prevAction.revision, originalAction.revision}) {
+            if (r.data().attributes->count(attrName) == 0) {
+                return false;
+            }
+        }
+
+        auto attr = action.revision.data().attributes->at(attrName);
+        auto prevAttr = prevAction.revision.data().attributes->at(attrName);
+        auto originalAttr = originalAction.revision.data().attributes->at(attrName);
+        if (attr != prevAttr and attr == originalAttr) {
+            return true;
+        }
+        return false;
+    };
+
+    for (const auto& attrName: attrNames) {
+        if (suspiciousByAttr(attrName)) {
+            return true;
+        }
     }
 
     return false;
@@ -342,7 +354,7 @@ void evalSomething(
     int sinceBranchId,
     int tillBranchId,
     const std::string& catName,
-    const std::string& attrName)
+    const std::vector<std::string>& attrNames)
 {
     auto txn = pool.slaveTransaction();
     mwr::BranchManager branchManager(*txn);
@@ -376,7 +388,7 @@ void evalSomething(
 
     ActionChains suspicionsChains;
     for (const auto& chain: chains) {
-        if (isSuspicious(chain, moderatorUids, attrName)) {
+        if (isSuspicious(chain, moderatorUids, attrNames)) {
             suspicionsChains.push_back(chain);
         }
     }
@@ -413,7 +425,7 @@ int main(int argc, const char** argv)
     std::cout << "hello" << std::endl;
     std::cout << "argc = " << argc << std::endl;
     if (argc < 6) {
-        std::cout << "expected cmd line: ./<exe> <connection string> <since branch> <till branch> <cat name> <attr name>" << std::endl;
+        std::cout << "expected cmd line: ./<exe> <connection string> <since branch> <till branch> <cat name> <attr names>" << std::endl;
         return 1;
     }
 
@@ -421,7 +433,14 @@ int main(int argc, const char** argv)
     int sinceBranchId = std::stoi(argv[2]);
     int tillBranchId = std::stoi(argv[3]);
     std::string catName(argv[4]);
-    std::string attrName(argv[5]);
+    std::string attrNamesStr(argv[5]);
+
+    std::vector<std::string> attrNames;
+    auto isComma = [](char c)
+    {
+        return (c == ',');
+    };
+    boost::split(attrNames, attrNamesStr, isComma);
 
     std::cout << "connection string = '" << connStr << "'" << std::endl;
     mpgp::PoolConfigurationPtr poolConfiguration(mpgp::PoolConfiguration::create());
@@ -439,7 +458,7 @@ int main(int argc, const char** argv)
         std::move(poolConstants)
     ));
 
-    evalSomething(*pool, sinceBranchId, tillBranchId, catName, attrName);
+    evalSomething(*pool, sinceBranchId, tillBranchId, catName, attrNames);
 
     return 0;
 }
