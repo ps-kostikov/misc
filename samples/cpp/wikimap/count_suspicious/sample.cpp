@@ -353,7 +353,7 @@ void evalSomething(
     maps::pgpool3::Pool& pool,
     int sinceBranchId,
     int tillBranchId,
-    const std::string& catName,
+    const std::vector<std::string>& catNames,
     const std::vector<std::string>& attrNames)
 {
     auto txn = pool.slaveTransaction();
@@ -372,13 +372,17 @@ void evalSomething(
 
     std::cout << "moderator uids size = " << moderatorUids.size() << std::endl;
 
+    mwr::filters::ProxyFilterExpr catFilter = mwr::filters::False();
+    for (const auto& catName: catNames) {
+        catFilter |= mwr::filters::Attr(catName).defined();
+    }
 
     auto revisionIds = reader.loadRevisionIds(
         mwr::filters::CommitAttr::isTrunk() &&
         mwr::filters::CommitAttr::stableBranchId() > sinceBranchId &&
         mwr::filters::CommitAttr::stableBranchId() <= tillBranchId &&
         mwr::filters::ObjRevAttr::isNotDeleted() &&
-        mwr::filters::Attr(catName).defined() && 
+        catFilter && 
         mwr::filters::CommitAttr("created_by").in(moderatorUids) /*&&
         mwr::filters::CommitAttribute("action").equals("commit-reverted")*/);
     std::cout << "revision ids size = " << revisionIds.size() << std::endl;
@@ -417,7 +421,16 @@ void evalSomething(
     std::cout << std::endl;
 }
 
-
+std::vector<std::string> strToVec(const std::string& str)
+{
+    auto isComma = [](char c)
+    {
+        return (c == ',');
+    };
+    std::vector<std::string> result;
+    boost::split(result, str, isComma);
+    return result;
+}
 
 int main(int argc, const char** argv)
 {
@@ -425,22 +438,15 @@ int main(int argc, const char** argv)
     std::cout << "hello" << std::endl;
     std::cout << "argc = " << argc << std::endl;
     if (argc < 6) {
-        std::cout << "expected cmd line: ./<exe> <connection string> <since branch> <till branch> <cat name> <attr names>" << std::endl;
+        std::cout << "expected cmd line: ./<exe> <connection string> <since branch> <till branch> <cat names> <attr names>" << std::endl;
         return 1;
     }
 
     std::string connStr(argv[1]);
     int sinceBranchId = std::stoi(argv[2]);
     int tillBranchId = std::stoi(argv[3]);
-    std::string catName(argv[4]);
-    std::string attrNamesStr(argv[5]);
-
-    std::vector<std::string> attrNames;
-    auto isComma = [](char c)
-    {
-        return (c == ',');
-    };
-    boost::split(attrNames, attrNamesStr, isComma);
+    auto catNames = strToVec(argv[4]);
+    auto attrNames = strToVec(argv[5]);
 
     std::cout << "connection string = '" << connStr << "'" << std::endl;
     mpgp::PoolConfigurationPtr poolConfiguration(mpgp::PoolConfiguration::create());
@@ -458,7 +464,7 @@ int main(int argc, const char** argv)
         std::move(poolConstants)
     ));
 
-    evalSomething(*pool, sinceBranchId, tillBranchId, catName, attrNames);
+    evalSomething(*pool, sinceBranchId, tillBranchId, catNames, attrNames);
 
     return 0;
 }
