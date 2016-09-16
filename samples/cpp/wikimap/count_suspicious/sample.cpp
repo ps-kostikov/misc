@@ -337,7 +337,12 @@ std::set<mw::social::TUid> allModeratorUids(maps::wiki::acl::ACLGateway& agw)
     return result;
 }
 
-void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchId, const std::string& attrName)
+void evalSomething(
+    maps::pgpool3::Pool& pool,
+    int sinceBranchId,
+    int tillBranchId,
+    const std::string& catName,
+    const std::string& attrName)
 {
     auto txn = pool.slaveTransaction();
     mwr::BranchManager branchManager(*txn);
@@ -361,7 +366,7 @@ void evalSomething(maps::pgpool3::Pool& pool, int sinceBranchId, int tillBranchI
         mwr::filters::CommitAttr::stableBranchId() > sinceBranchId &&
         mwr::filters::CommitAttr::stableBranchId() <= tillBranchId &&
         mwr::filters::ObjRevAttr::isNotDeleted() &&
-        mwr::filters::Attr("cat:rd_el").defined() && 
+        mwr::filters::Attr(catName).defined() && 
         mwr::filters::CommitAttr("created_by").in(moderatorUids) /*&&
         mwr::filters::CommitAttribute("action").equals("commit-reverted")*/);
     std::cout << "revision ids size = " << revisionIds.size() << std::endl;
@@ -407,15 +412,16 @@ int main(int argc, const char** argv)
 
     std::cout << "hello" << std::endl;
     std::cout << "argc = " << argc << std::endl;
-    if (argc < 5) {
-        std::cout << "expected cmd line: ./<exe> <connection string> <since branch> <till branch> <attr name>" << std::endl;
+    if (argc < 6) {
+        std::cout << "expected cmd line: ./<exe> <connection string> <since branch> <till branch> <cat name> <attr name>" << std::endl;
         return 1;
     }
 
     std::string connStr(argv[1]);
     int sinceBranchId = std::stoi(argv[2]);
     int tillBranchId = std::stoi(argv[3]);
-    std::string attrName(argv[4]);
+    std::string catName(argv[4]);
+    std::string attrName(argv[5]);
 
     std::cout << "connection string = '" << connStr << "'" << std::endl;
     mpgp::PoolConfigurationPtr poolConfiguration(mpgp::PoolConfiguration::create());
@@ -433,7 +439,7 @@ int main(int argc, const char** argv)
         std::move(poolConstants)
     ));
 
-    evalSomething(*pool, sinceBranchId, tillBranchId, attrName);
+    evalSomething(*pool, sinceBranchId, tillBranchId, catName, attrName);
 
     return 0;
 }
