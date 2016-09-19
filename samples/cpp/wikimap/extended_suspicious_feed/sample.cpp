@@ -78,6 +78,44 @@ loadUsers(
     return result;
 }
 
+enum class BanStatus
+{
+    Active,
+    TmpBanned,
+    Banned
+};
+
+std::ostream& operator << (std::ostream& os, BanStatus s)
+{
+    switch (s) {
+        case BanStatus::Active: os << "active"; break;
+        case BanStatus::TmpBanned:  os << "tmp_banned";  break;
+        case BanStatus::Banned: os << "banned";  break;
+    }
+    return os;
+}
+std::map<mws::TUid, BanStatus>
+loadBanStatuses(
+    maps::wiki::acl::ACLGateway& agw,
+    const std::vector<mws::TUid>& uids)
+{
+    std::map<mws::TUid, BanStatus> result;
+    for (const auto& uid: uids) {
+        auto pagedBanRecords = agw.banRecords(uid, 0, 0);
+
+        BanStatus status = BanStatus::Active;
+        for (const auto& banRecord: pagedBanRecords.value()) {
+            if (banRecord.expires().empty()) {
+                status = BanStatus::Banned;
+                break;
+            } else {
+                status = BanStatus::TmpBanned;
+            }
+        }
+        result[uid] = status;
+    }
+    return result;
+}
 
 struct Situation
 {
@@ -226,8 +264,10 @@ void printFeed(
     }
 }
 
+
 void printSituations(
     const std::vector<Situation>& situations,
+    const std::map<mws::TUid, BanStatus>& banStatuses,
     maps::wiki::acl::ACLGateway& agw)
 {
     std::vector<mws::TUid> uids;
@@ -243,7 +283,8 @@ void printSituations(
         const auto objectId = s.event.primaryObjectData()->id();
         const auto commitId = s.event.commitData().commitId();
         std::cout << moderator.login() << "(" << moderator.uid() << ") "
-            << "corrected " << user.login() << "(" << user.uid() << "); "
+            << "corrected " << user.login() << "(" << user.uid() << ") "
+            << "(" << banStatuses.at(user.uid()) << ") "
             << "commit id: " << commitId << "; "
             << "primary object id: " << objectId << "; "
             << "history url: https://n.maps.yandex.ru/#!/objects/" << objectId << "/history/" << commitId << std::endl;
@@ -253,11 +294,17 @@ void printSituations(
 
 
 std::vector<Situation>
-filterSituations(const std::vector<Situation>& situations)
+filterSituations(
+    const std::vector<Situation>& situations,
+    const std::map<mws::TUid, BanStatus>& banStatuses)
 {
     std::vector<Situation> result;
     for (const auto& s: situations) {
         if (s.moderatorCommit.createdBy() == s.userCommit.createdBy()) {
+            continue;
+        }
+
+        if (banStatuses.at(s.userCommit.createdBy()) == BanStatus::Banned) {
             continue;
         }
 
@@ -303,8 +350,17 @@ void evalSomething(
     // printFeed(feed, usersMap);
 
     auto situations = loadSituations(feed, rgw);
-    auto filteredSituations = filterSituations(situations);
-    printSituations(situations, agw);
+
+    std::vector<mws::TUid> userUids;
+    for (const auto& s: situations) {
+        userUids.push_back(s.userCommit.createdBy());
+    }
+    auto banStatuses = loadBanStatuses(agw, userUids);
+    // for (const auto& p: banStatuses) {
+    //     std::cout << p.first << ": " << p.second << std::endl;
+    // }
+    auto filteredSituations = filterSituations(situations, banStatuses);
+    printSituations(filteredSituations, banStatuses, agw);
 }
 
 std::vector<std::string> strToVec(const std::string& str)
