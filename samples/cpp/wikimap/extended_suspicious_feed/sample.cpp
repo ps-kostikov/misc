@@ -65,16 +65,33 @@ void printFeed(const mws::Feed& feed)
     }
 }
 
+std::vector<mw::social::TUid> uidsFromRole(
+    maps::wiki::acl::ACLGateway& agw,
+    const std::string& roleName)
+{
+    auto role = agw.role(roleName);
+    auto pagedUserVector = agw.users(0, role.id(), 0, boost::none, 0, 0);
+    std::vector<mw::social::TUid> result;
+    for (const auto& user: pagedUserVector.value()) {
+        result.push_back(user.uid());
+    }
+    std::cout << "role '" << roleName << "' consists of " << result.size() << " users" << std::endl;
+    return result;
+}
+
 void evalSomething(
     maps::pgpool3::Pool& pool,
     std::string since,
     std::string till,
-    const std::vector<std::string>& allowedActionStrs)
+    const std::vector<std::string>& allowedActionStrs,
+    const std::string& roleName)
 {
     auto txn = pool.slaveTransaction();
     // mwr::BranchManager branchManager(*txn);
 
+    maps::wiki::acl::ACLGateway agw(*txn);
     mws::Gateway sgw(*txn);
+
     mws::FeedFilter feedFilter;
     feedFilter.createdAfter(mw::common::parseIsoDateTime(since));
     feedFilter.createdBefore(mw::common::parseIsoDateTime(till));
@@ -83,6 +100,9 @@ void evalSomething(
         allowedActions.push_back(boost::lexical_cast<mws::FeedAction>(str));
     }
     feedFilter.actionsAllowed(allowedActions);
+    auto uids = uidsFromRole(agw, roleName);
+    feedFilter.createdBy(uids);
+
     // auto tillBranch = branchManager.load(tillBranchId);
     // mwr::RevisionsGateway rgw(*txn, tillBranch);
     // auto reader = rgw.reader();
@@ -110,8 +130,8 @@ int main(int argc, const char** argv)
 {
 
     std::cout << "hello" << std::endl;
-    if (argc < 5) {
-        std::cout << "expected cmd line: ./<exe> <connection string> <since> <till> <allowed actions>" << std::endl;
+    if (argc < 6) {
+        std::cout << "expected cmd line: ./<exe> <connection string> <since> <till> <allowed actions> <role>" << std::endl;
         return 1;
     }
 
@@ -119,6 +139,7 @@ int main(int argc, const char** argv)
     std::string since(argv[2]);
     std::string till(argv[3]);
     auto allowedActions = strToVec(argv[4]);
+    std::string roleName(argv[5]);
 
     std::cout << "connection string = '" << connStr << "'" << std::endl;
     mpgp::PoolConfigurationPtr poolConfiguration(mpgp::PoolConfiguration::create());
@@ -136,7 +157,7 @@ int main(int argc, const char** argv)
         std::move(poolConstants)
     ));
 
-    evalSomething(*pool, since, till, allowedActions);
+    evalSomething(*pool, since, till, allowedActions, roleName);
 
     return 0;
 }
