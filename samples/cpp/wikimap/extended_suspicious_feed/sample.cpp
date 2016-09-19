@@ -51,31 +51,6 @@ public:
     }
 };
 
-void printFeed(
-    const mws::Feed& feed,
-    const std::map<mws::TUid, mw::acl::User>& usersMap)
-{
-    const size_t batchSize = 100;
-    auto count = feed.count();
-    for (size_t batchIndex = 0; batchIndex <= count / batchSize; ++batchIndex) {
-        auto events = feed.events(batchIndex * batchSize, batchSize);
-        for (const auto& event: events) {
-            if (!event.primaryObjectData()) {
-                continue;
-            }
-            const auto uid = event.createdBy();
-            const auto& user = usersMap.at(uid);
-            const auto objectId = event.primaryObjectData()->id();
-            const auto commitId = event.commitData().commitId();
-            std::cout << "created by: " << user.login() << "(" << uid << "); "
-                << "commit id: " << commitId << "; "
-                << "primary object id: " << objectId << "; "
-                << "history url: https://n.maps.yandex.ru/#!/objects/" << objectId << "/history/" << commitId << std::endl;
-        }
-        // std::cout << "event count = " << events.size() << std::endl;
-    }
-}
-
 std::vector<mws::TUid> uidsFromRole(
     maps::wiki::acl::ACLGateway& agw,
     const std::string& roleName)
@@ -103,6 +78,194 @@ loadUsers(
     return result;
 }
 
+
+struct Situation
+{
+    mws::Event event;
+    mwr::Commit moderatorCommit;
+    mwr::ObjectRevision moderatorRevision;
+    mwr::Commit userCommit;
+    mwr::ObjectRevision userRevision;
+};
+
+std::vector<Situation>
+loadSituations(
+    const mws::Feed& feed,
+    mwr::RevisionsGateway& rgw)
+{
+    std::vector<mws::Event> events;
+    const size_t batchSize = 100;
+    auto count = feed.count();
+    for (size_t batchIndex = 0; batchIndex <= count / batchSize; ++batchIndex) {
+        auto eventsBatch = feed.events(batchIndex * batchSize, batchSize);
+        for (const auto& event: eventsBatch) {
+            if (!event.primaryObjectData()) {
+                continue;
+            }
+            events.push_back(event);
+        }
+    }
+
+    std::map<mwr::DBID, mwr::Commit> preloadedCommits;
+    std::map<mwr::RevisionID, mwr::ObjectRevision> preloadedObjectRevisions;
+
+    {
+        std::vector<mwr::DBID> commitIdsToLoad;
+        for (const auto& event: events) {
+            commitIdsToLoad.push_back(event.commitData().commitId());
+        }
+        std::cout << "before commit load" << std::endl;
+        auto commits = mwr::Commit::load(
+            rgw.work(),
+            mwr::filters::CommitAttr::id().in(commitIdsToLoad));
+        std::cout << "after commit load" << std::endl;
+
+        for (const auto& commit: commits) {
+            preloadedCommits.emplace(commit.id(), commit);
+        }
+    }
+
+    std::vector<mwr::RevisionID> prevRevisionIdsToLoad;
+    {
+        std::vector<mwr::RevisionID> revisionIdsToLoad;
+        for (const auto& event: events) {
+            const auto objectId = event.primaryObjectData()->id();
+            const auto commitId = event.commitData().commitId();
+            revisionIdsToLoad.push_back(mwr::RevisionID{objectId, commitId});
+        }
+        auto reader = rgw.reader();
+        std::cout << "before revisions load" << std::endl;
+        auto revisions = reader.loadRevisions(revisionIdsToLoad);
+        std::cout << "after revisions load" << std::endl;
+        for (const auto& revision: revisions) {
+            preloadedObjectRevisions.emplace(revision.id(), revision);
+        }
+
+        for (const auto& revision: revisions) {
+            preloadedObjectRevisions.emplace(revision.id(), revision);
+            if (!revision.prevId().empty()) {
+                prevRevisionIdsToLoad.push_back(revision.prevId());
+            }
+        }
+    }
+
+    {
+        std::vector<mwr::DBID> commitIdsToLoad;
+        for (const auto& revisionId: prevRevisionIdsToLoad) {
+            commitIdsToLoad.push_back(revisionId.commitId());
+        }
+        std::cout << "before prev commit load" << std::endl;
+        auto commits = mwr::Commit::load(
+            rgw.work(),
+            mwr::filters::CommitAttr::id().in(commitIdsToLoad));
+        std::cout << "after prev commit load" << std::endl;
+
+        for (const auto& commit: commits) {
+            preloadedCommits.emplace(commit.id(), commit);
+        }
+    }
+
+    {
+        auto reader = rgw.reader();
+        std::cout << "before prev revisions load" << std::endl;
+        auto revisions = reader.loadRevisions(prevRevisionIdsToLoad);
+        std::cout << "after prev revisions load" << std::endl;
+        for (const auto& revision: revisions) {
+            preloadedObjectRevisions.emplace(revision.id(), revision);
+        }
+    }
+
+    std::vector<Situation> situations;
+    for (const auto& event: events) {
+
+        const auto objectId = event.primaryObjectData()->id();
+        const auto commitId = event.commitData().commitId();
+
+        auto moderatorCommit = preloadedCommits.at(commitId);
+        auto moderatorRevision = preloadedObjectRevisions.at(mwr::RevisionID{objectId, commitId});
+
+        if (moderatorRevision.prevId().empty()) {
+            continue;
+        }
+        auto userCommit = preloadedCommits.at(moderatorRevision.prevId().commitId());
+        auto userRevision = preloadedObjectRevisions.at(moderatorRevision.prevId());
+
+        situations.push_back(Situation{
+            event,
+            moderatorCommit,
+            moderatorRevision,
+            userCommit,
+            userRevision
+        });
+    }
+    return situations;
+}
+
+void printFeed(
+    const mws::Feed& feed,
+    const std::map<mws::TUid, mw::acl::User>& usersMap)
+{
+    const size_t batchSize = 100;
+    auto count = feed.count();
+    for (size_t batchIndex = 0; batchIndex <= count / batchSize; ++batchIndex) {
+        auto events = feed.events(batchIndex * batchSize, batchSize);
+        for (const auto& event: events) {
+            if (!event.primaryObjectData()) {
+                continue;
+            }
+            const auto uid = event.createdBy();
+            const auto& user = usersMap.at(uid);
+            const auto objectId = event.primaryObjectData()->id();
+            const auto commitId = event.commitData().commitId();
+            std::cout << "created by: " << user.login() << "(" << uid << "); "
+                << "commit id: " << commitId << "; "
+                << "primary object id: " << objectId << "; "
+                << "history url: https://n.maps.yandex.ru/#!/objects/" << objectId << "/history/" << commitId << std::endl;
+        }
+        // std::cout << "event count = " << events.size() << std::endl;
+    }
+}
+
+void printSituations(
+    const std::vector<Situation>& situations,
+    maps::wiki::acl::ACLGateway& agw)
+{
+    std::vector<mws::TUid> uids;
+    for (const auto& s: situations) {
+        uids.push_back(s.moderatorCommit.createdBy());
+        uids.push_back(s.userCommit.createdBy());
+    }
+    auto usersMap = loadUsers(agw, uids);
+
+    for (const auto& s: situations) {
+        auto moderator = usersMap.at(s.moderatorCommit.createdBy());
+        auto user = usersMap.at(s.userCommit.createdBy());
+        const auto objectId = s.event.primaryObjectData()->id();
+        const auto commitId = s.event.commitData().commitId();
+        std::cout << moderator.login() << "(" << moderator.uid() << ") "
+            << "corrected " << user.login() << "(" << user.uid() << "); "
+            << "commit id: " << commitId << "; "
+            << "primary object id: " << objectId << "; "
+            << "history url: https://n.maps.yandex.ru/#!/objects/" << objectId << "/history/" << commitId << std::endl;
+    }
+
+}
+
+
+std::vector<Situation>
+filterSituations(const std::vector<Situation>& situations)
+{
+    std::vector<Situation> result;
+    for (const auto& s: situations) {
+        if (s.moderatorCommit.createdBy() == s.userCommit.createdBy()) {
+            continue;
+        }
+
+        result.push_back(s);
+    }
+    return result;
+}
+
 void evalSomething(
     maps::pgpool3::Pool& pool,
     std::string since,
@@ -113,6 +276,7 @@ void evalSomething(
     auto txn = pool.slaveTransaction();
     // mwr::BranchManager branchManager(*txn);
 
+    mwr::RevisionsGateway rgw(*txn);
     maps::wiki::acl::ACLGateway agw(*txn);
     mws::Gateway sgw(*txn);
 
@@ -134,10 +298,13 @@ void evalSomething(
 
     auto feed = sgw.suspiciousFeed(0, feedFilter);
     std::cout << "feed count = " << feed.count() << std::endl;
-    printFeed(feed, usersMap);
-    // std::cout << "since = " << since << std::endl;
-    // std::cout << "till = " << till << std::endl;
 
+
+    // printFeed(feed, usersMap);
+
+    auto situations = loadSituations(feed, rgw);
+    auto filteredSituations = filterSituations(situations);
+    printSituations(situations, agw);
 }
 
 std::vector<std::string> strToVec(const std::string& str)
