@@ -147,15 +147,15 @@ loadSituations(
     std::map<mwr::DBID, mwr::Commit> preloadedCommits;
     std::map<mwr::RevisionID, mwr::ObjectRevision> preloadedObjectRevisions;
 
+    std::vector<mwr::DBID> commitIdsToLoadFirst;
     {
-        std::vector<mwr::DBID> commitIdsToLoad;
         for (const auto& event: events) {
-            commitIdsToLoad.push_back(event.commitData().commitId());
+            commitIdsToLoadFirst.push_back(event.commitData().commitId());
         }
         std::cout << "before commit load" << std::endl;
         auto commits = mwr::Commit::load(
             rgw.work(),
-            mwr::filters::CommitAttr::id().in(commitIdsToLoad));
+            mwr::filters::CommitAttr::id().in(commitIdsToLoadFirst));
         std::cout << "after commit load" << std::endl;
 
         for (const auto& commit: commits) {
@@ -165,13 +165,17 @@ loadSituations(
 
     std::vector<mwr::RevisionID> prevRevisionIdsToLoad;
     {
-        std::vector<mwr::RevisionID> revisionIdsToLoad;
-        for (const auto& event: events) {
-            const auto objectId = event.primaryObjectData()->id();
-            const auto commitId = event.commitData().commitId();
-            revisionIdsToLoad.push_back(mwr::RevisionID{objectId, commitId});
-        }
         auto reader = rgw.reader();
+        std::vector<mwr::RevisionID> revisionIdsToLoad = reader.loadRevisionIds(
+            mwr::filters::CommitAttr::isTrunk() && 
+            mwr::filters::CommitAttr::id().in(commitIdsToLoadFirst));
+
+            
+        // for (const auto& event: events) {
+        //     const auto objectId = event.primaryObjectData()->id();
+        //     const auto commitId = event.commitData().commitId();
+        //     revisionIdsToLoad.push_back(mwr::RevisionID{objectId, commitId});
+        // }
         std::cout << "before revisions load" << std::endl;
         auto revisions = reader.loadRevisions(revisionIdsToLoad);
         std::cout << "after revisions load" << std::endl;
@@ -218,6 +222,10 @@ loadSituations(
 
         const auto objectId = event.primaryObjectData()->id();
         const auto commitId = event.commitData().commitId();
+
+        if (!preloadedObjectRevisions.count(mwr::RevisionID{objectId, commitId})) {
+            continue;
+        }
 
         auto moderatorCommit = preloadedCommits.at(commitId);
         auto moderatorRevision = preloadedObjectRevisions.at(mwr::RevisionID{objectId, commitId});
@@ -361,6 +369,7 @@ void evalSomething(
     // }
     auto filteredSituations = filterSituations(situations, banStatuses);
     printSituations(filteredSituations, banStatuses, agw);
+    std::cout << "total count = " << filteredSituations.size() << std::endl;
 }
 
 std::vector<std::string> strToVec(const std::string& str)
