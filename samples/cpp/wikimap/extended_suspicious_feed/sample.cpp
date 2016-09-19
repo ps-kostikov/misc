@@ -51,31 +51,48 @@ public:
     }
 };
 
-void printFeed(const mws::Feed& feed)
+void printFeed(
+    const mws::Feed& feed,
+    const std::map<mws::TUid, mw::acl::User>& usersMap)
 {
     const size_t batchSize = 100;
     auto count = feed.count();
     for (size_t batchIndex = 0; batchIndex <= count / batchSize; ++batchIndex) {
         auto events = feed.events(batchIndex * batchSize, batchSize);
         for (const auto& event: events) {
-            std::cout << "created by: " << event.createdBy() << "; "
+            const auto uid = event.createdBy();
+            const auto& user = usersMap.at(uid);
+            std::cout << "created by: " << user.login() << "(" << uid << "); "
                 << "commit id: " << event.commitData().commitId() << "; " << std::endl;
         }
         // std::cout << "event count = " << events.size() << std::endl;
     }
 }
 
-std::vector<mw::social::TUid> uidsFromRole(
+std::vector<mws::TUid> uidsFromRole(
     maps::wiki::acl::ACLGateway& agw,
     const std::string& roleName)
 {
     auto role = agw.role(roleName);
     auto pagedUserVector = agw.users(0, role.id(), 0, boost::none, 0, 0);
-    std::vector<mw::social::TUid> result;
+    std::vector<mws::TUid> result;
     for (const auto& user: pagedUserVector.value()) {
         result.push_back(user.uid());
     }
     std::cout << "role '" << roleName << "' consists of " << result.size() << " users" << std::endl;
+    return result;
+}
+
+std::map<mws::TUid, mw::acl::User>
+loadUsers(
+    maps::wiki::acl::ACLGateway& agw,
+    const std::vector<mws::TUid>& uids)
+{
+    auto users = agw.users(uids);
+    std::map<mws::TUid, mw::acl::User> result;
+    for (const auto& user: users) {
+        result.emplace(user.uid(), user);
+    }
     return result;
 }
 
@@ -103,13 +120,14 @@ void evalSomething(
     auto uids = uidsFromRole(agw, roleName);
     feedFilter.createdBy(uids);
 
+    auto usersMap = loadUsers(agw, uids);
     // auto tillBranch = branchManager.load(tillBranchId);
     // mwr::RevisionsGateway rgw(*txn, tillBranch);
     // auto reader = rgw.reader();
 
     auto feed = sgw.suspiciousFeed(0, feedFilter);
     std::cout << "feed count = " << feed.count() << std::endl;
-    printFeed(feed);
+    printFeed(feed, usersMap);
     // std::cout << "since = " << since << std::endl;
     // std::cout << "till = " << till << std::endl;
 
