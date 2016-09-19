@@ -60,10 +60,17 @@ void printFeed(
     for (size_t batchIndex = 0; batchIndex <= count / batchSize; ++batchIndex) {
         auto events = feed.events(batchIndex * batchSize, batchSize);
         for (const auto& event: events) {
+            if (!event.primaryObjectData()) {
+                continue;
+            }
             const auto uid = event.createdBy();
             const auto& user = usersMap.at(uid);
+            const auto objectId = event.primaryObjectData()->id();
+            const auto commitId = event.commitData().commitId();
             std::cout << "created by: " << user.login() << "(" << uid << "); "
-                << "commit id: " << event.commitData().commitId() << "; " << std::endl;
+                << "commit id: " << commitId << "; "
+                << "primary object id: " << objectId << "; "
+                << "history url: https://n.maps.yandex.ru/#!/objects/" << objectId << "/history/" << commitId << std::endl;
         }
         // std::cout << "event count = " << events.size() << std::endl;
     }
