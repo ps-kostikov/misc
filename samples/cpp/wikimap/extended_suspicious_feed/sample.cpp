@@ -19,6 +19,8 @@
 #include <yandex/maps/wiki/common/date_time.h>
 #include <yandex/maps/wiki/common/paged_result.h>
 
+#include <pqxx>
+
 #include <boost/algorithm/string/split.hpp>
 
 #include <iostream>
@@ -50,6 +52,41 @@ public:
         return "pgppool3";
     }
 };
+
+struct Comment
+{
+    mwr::DBID objectId;
+    mwr::DBID commitId;
+    mwr::UserID createdBy;
+};
+
+bool operator<(const Comment& left, const Comment& right)
+{
+    if (left.objectId != right.objectId) {
+        return left.objectId < right.objectId;
+    }
+    if (left.commitId != right.commitId) {
+        return left.commitId < right.commitId;
+    }
+    return left.createdBy < right.createdBy;
+}
+
+std::set<Comment>
+loadComments(maps::pqxx::transaction_base& work)
+{
+    auto rows = work.exec("select object_id, commit_id, created_by from social.comment;");
+    std::set<Comment> result;
+    for (const auto& row: rows) {
+        Comment c{
+            row["object_id"].as<mwr::DBID>(),
+            row["commit_id"].as<mwr::DBID>(),
+            row["created_by"].as<mwr::UserID>()
+        };
+        result.insert(c);
+    }
+    return result;
+}
+
 
 std::vector<mws::TUid> uidsFromRole(
     maps::wiki::acl::ACLGateway& agw,
@@ -276,7 +313,8 @@ void printFeed(
 void printSituations(
     const std::vector<Situation>& situations,
     const std::map<mws::TUid, BanStatus>& banStatuses,
-    maps::wiki::acl::ACLGateway& agw)
+    maps::wiki::acl::ACLGateway& agw,
+    const std::set<Comment>& comments)
 {
     std::vector<mws::TUid> uids;
     for (const auto& s: situations) {
@@ -285,18 +323,45 @@ void printSituations(
     }
     auto usersMap = loadUsers(agw, uids);
 
+    size_t withComment = 0;
+    size_t withoutComment = 0;
+
     for (const auto& s: situations) {
         auto moderator = usersMap.at(s.moderatorCommit.createdBy());
         auto user = usersMap.at(s.userCommit.createdBy());
         const auto objectId = s.event.primaryObjectData()->id();
         const auto commitId = s.event.commitData().commitId();
+
+
+        Comment expectedComment{
+            s.userRevision.id().objectId(),
+            s.userCommit.id(),
+            moderator.uid()
+        };
+
+        bool commented = (comments.count(expectedComment) > 0);
+        if (commented) {
+            ++withComment;
+        } else {
+            ++withoutComment;
+        }
+
         std::cout << moderator.login() << "(" << moderator.uid() << ") "
             << "corrected " << user.login() << "(" << user.uid() << ") "
             << "(" << banStatuses.at(user.uid()) << ") "
-            << "commit id: " << commitId << "; "
-            << "primary object id: " << objectId << "; "
-            << "history url: https://n.maps.yandex.ru/#!/objects/" << objectId << "/history/" << commitId << std::endl;
+            << (commented ? "with comment" : "without comment")
+            << " history url: https://n.maps.yandex.ru/#!/objects/" << objectId << "/history/" << commitId
+            << " commit id: " << commitId << "; "
+            << " primary object id: " << objectId << "; " << std::endl;
     }
+
+    std::cout << "withComment = " << withComment << std::endl;
+    std::cout << "withoutComment = " << withoutComment << std::endl;
+    double commentedPercentage = 0.;
+    if (withoutComment + withComment > 0) {
+        commentedPercentage = 100 * withComment / static_cast<double>(withoutComment + withComment);
+    }
+    std::cout << "commented percentage: " << commentedPercentage << "%" << std::endl;
 
 }
 
@@ -368,7 +433,10 @@ void evalSomething(
     //     std::cout << p.first << ": " << p.second << std::endl;
     // }
     auto filteredSituations = filterSituations(situations, banStatuses);
-    printSituations(filteredSituations, banStatuses, agw);
+
+    auto comments = loadComments(*txn);
+
+    printSituations(filteredSituations, banStatuses, agw, comments);
     std::cout << "total count = " << filteredSituations.size() << std::endl;
 }
 
