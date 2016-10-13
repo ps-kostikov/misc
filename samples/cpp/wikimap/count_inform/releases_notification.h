@@ -6,6 +6,7 @@
 #include <yandex/maps/wiki/common/geom.h>
 #include <yandex/maps/wiki/common/date_time.h>
 #include <yandex/maps/wiki/common/task_logger.h>
+#include <yandex/maps/wiki/tasks/tasks.h>
 #include <yandex/maps/wiki/revision/common.h>
 #include <yandex/maps/wiki/revision/commit.h>
 
@@ -65,6 +66,11 @@ std::map<maps::wiki::revision::UserID, VecUserData> getVecReleaseUsers_takeAllDe
     maps::wiki::revision::DBID tillBranchId);
 
 std::map<maps::wiki::revision::UserID, VecUserData> getVecReleaseUsers_onlyLastCommits(
+    maps::pgpool3::Pool& pool,
+    maps::wiki::revision::DBID sinceBranchId,
+    maps::wiki::revision::DBID tillBranchId);
+
+std::map<maps::wiki::revision::UserID, VecUserData> getVecReleaseUsers_onlyLastCommits_Final(
     maps::pgpool3::Pool& pool,
     maps::wiki::revision::DBID sinceBranchId,
     maps::wiki::revision::DBID tillBranchId);

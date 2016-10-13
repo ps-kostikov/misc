@@ -23,6 +23,7 @@ sample: LIBS = \
 	yandex-maps-wiki-common \
 	yandex-maps-wiki-revision \
 	yandex-maps-wiki-social \
+	yandex-maps-wiki-tasks \
 	yandex-maps-xml3 \
 	xml2 \
 	yandex-maps-pqxx \

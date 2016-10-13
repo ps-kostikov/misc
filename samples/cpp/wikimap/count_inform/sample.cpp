@@ -113,29 +113,29 @@ int main(int argc, const char** argv)
 
     auto exclUids = excludedUids(*pool);
 
-    std::cout << "without reverts:" << std::endl;
-    printStats(
-        mw::releases_notification::getVecReleaseUsers_withoutReverts(
-            *pool, sinceBranchId, tillBranchId),
-        exclUids);
-    std::cout << "original:" << std::endl;
-    printStats(
-        mw::releases_notification::getVecReleaseUsers_original(
-            *pool, sinceBranchId, tillBranchId),
-        exclUids);
-    std::cout << "take all reverts in account:" << std::endl;
-    printStats(
-        mw::releases_notification::getVecReleaseUsers_takeAllRevertedInAccount(
-            *pool, sinceBranchId, tillBranchId),
-        exclUids);
-    std::cout << "take all deleted in account:" << std::endl;
-    printStats(
-        mw::releases_notification::getVecReleaseUsers_takeAllDeletedInAccount(
-            *pool, sinceBranchId, tillBranchId),
-        exclUids);
+    // std::cout << "without reverts:" << std::endl;
+    // printStats(
+    //     mw::releases_notification::getVecReleaseUsers_withoutReverts(
+    //         *pool, sinceBranchId, tillBranchId),
+    //     exclUids);
+    // std::cout << "original:" << std::endl;
+    // printStats(
+    //     mw::releases_notification::getVecReleaseUsers_original(
+    //         *pool, sinceBranchId, tillBranchId),
+    //     exclUids);
+    // std::cout << "take all reverts in account:" << std::endl;
+    // printStats(
+    //     mw::releases_notification::getVecReleaseUsers_takeAllRevertedInAccount(
+    //         *pool, sinceBranchId, tillBranchId),
+    //     exclUids);
+    // std::cout << "take all deleted in account:" << std::endl;
+    // printStats(
+    //     mw::releases_notification::getVecReleaseUsers_takeAllDeletedInAccount(
+    //         *pool, sinceBranchId, tillBranchId),
+    //     exclUids);
     std::cout << "only snapshot commits:" << std::endl;
     printStats(
-        mw::releases_notification::getVecReleaseUsers_onlyLastCommits(
+        mw::releases_notification::getVecReleaseUsers_onlyLastCommits_Final(
             *pool, sinceBranchId, tillBranchId),
         exclUids);
     return 0;
