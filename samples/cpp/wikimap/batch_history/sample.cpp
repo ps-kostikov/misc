@@ -126,9 +126,9 @@ void conductExperiment(maps::pgpool3::Pool& pool, const std::vector<FeedItem>& i
             mwr::filters::ObjRevAttr::masterObjectId().in(objectIds)
         )
     );
-    auto relationsIds = snapshot.revisionIdsByFilter(relsFilter);
-    for (const auto& revId : relationsIds) {
-        commitIds.insert(revId.commitId());
+    auto relations = snapshot.relationsByFilter(relsFilter);
+    for (const auto& relation : relations) {
+        commitIds.insert(relation.id().commitId());
     }
 
     
