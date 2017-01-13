@@ -53,17 +53,23 @@ def enqueue_msgs():
             if msg.text is None:
                 continue
 
+            if not hasattr(msg, 'sender'):
+                continue
+            if not hasattr(msg.sender, 'username'):
+                continue
+
             if msg.sender.username == 'ChatWarsBot':
                 chat_wars_msg_queue.put(msg)
             if msg.sender.username == 'blackcastlebot':
                 command_chat_msg_queue.put(msg)
-
-    except GeneratorExit:
-        pass
-    except KeyboardInterrupt:
-        pass
+    except:
+        logger.exception("receiver dies")
+    # except GeneratorExit:
+    #     pass
+    # except KeyboardInterrupt:
+    #     pass
     else:
-        pass
+        logger.info("receiver quit")
 
 def run_receiver():
     receiver = Receiver(host="localhost", port=4458)
@@ -142,8 +148,9 @@ def main():
 
     sender = Sender(host="localhost", port=4458)
 
-    # for i in range(2):
+    # for i in range(7):
     #     do_forest(sender)
+    # return
 
     # for color in (BLUE, RED, WHITE, YELLOW):
     #     do_attack(sender, color)
