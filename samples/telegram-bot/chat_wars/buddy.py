@@ -33,11 +33,37 @@ WHITE = u'🇨🇾'
 YELLOW = u'🇻🇦'
 HERO = u'🏅Герой'
 
+QUESTS = u'🗺 Квесты'
+CASTLE = u'🏰Замок'
+ARENA = u'📯Арена'
+DO_SEARCH = u'🔎Поиск соперника'
+CANCEL_SEARCH = u'✖️Отменить поиск'
+
 # ------ not checked
 BLACK = u'🇬🇵'
+
+BACK = u'⬅️Назад'
+KOROVANY = u'🐫ГРАБИТЬ КОРОВАНЫ'
+
+TAVERN = u'🍺Таверна'
+
+HIT_HEAD = u'🗡в голову'
+HIT_TORSO = u'🗡по корпусу'
+HIT_LEGS = u'🗡по ногам'
+DEF_HEAD = u'🛡головы'
+DEF_TORSO = u'🛡корпуса'
+DEF_LEGS = u'🛡ног'
+
+HITS = [
+    HIT_HEAD,
+    HIT_TORSO,
+    HIT_LEGS,
+]
+DEFS = []
+HITS_DEFS = HITS + DEFS
 # -------
 
-DEFAULT_TARGET = RED
+DEFAULT_TARGET = BLUE
 
 @coroutine
 def enqueue_msgs():
@@ -89,9 +115,24 @@ def wait_forest_done():
             # print msg
             if u'Вы вернулись из леса' in msg.text or u'Вы заработали' in msg.text:
                 logger.info("wait_forest_done complete")
-                return
+                return True
         time.sleep(delay)
     logger.info('time is out; quit forest')
+    return False
+
+def wait_arena_search_done():
+    logger.info('wait_arena_search_done')
+    sec_to_wait = 5 * 60
+    delay = 10
+    for i in range(sec_to_wait / delay):
+        while not chat_wars_msg_queue.empty():
+            msg = chat_wars_msg_queue.get()
+            if u'У тебя 30 секунд' in msg.text:
+                logger.info("wait_arena_search_done complete")
+                return True
+        time.sleep(delay)
+
+    return False
 
 def wait_any():
     logger.info('wait any')
@@ -101,12 +142,18 @@ def wait_any():
         while not chat_wars_msg_queue.empty():
             msg = chat_wars_msg_queue.get()
             logger.info("wait any complete")
-            return
+            return True
         time.sleep(delay)
     logger.info('time is out; quit forest')
+    return False
+
+
 
 
 def do_forest(sender):
+    logger.info("send quests")
+    sender.send_msg(CHAT_WARS_PEER, QUESTS)
+    wait_any()
     logger.info("send forest")
     sender.send_msg(CHAT_WARS_PEER, FOREST)
     wait_forest_done()
@@ -130,6 +177,58 @@ def do_go(sender):
     wait_any()
     wait_any()
 
+def do_battle_step(sender, options):
+    logging.info("send hit def")
+    sender.send_msg(CHAT_WARS_PEER, random.choice(options))
+    sec_to_wait = 3 * 60
+    delay = 1
+    for i in range(sec_to_wait / delay):
+        while not chat_wars_msg_queue.empty():
+            msg = chat_wars_msg_queue.get()
+            if u'У тебя 30 секунд' in msg.text:
+                return HITS_DEFS
+            elif u'Выбери место удара' in msg.text:
+                return HITS
+            elif u'определиться с защитой' in msg.text:
+                return DEFS
+            elif u'Таблица победителей обновлена' in msg.text:
+                return []
+            else:
+                logger.info("unexpected battle answer")
+                return HITS_DEFS
+        time.sleep(delay)
+    logger.info('time is out; quit battle step')
+    return []
+
+def do_arena(sender):
+    logger.info("send castle")
+    sender.send_msg(CHAT_WARS_PEER, CASTLE)
+    wait_any()
+    logger.info("send arena")
+    sender.send_msg(CHAT_WARS_PEER, ARENA)
+    wait_any()
+    logger.info("send search")
+    sender.send_msg(CHAT_WARS_PEER, DO_SEARCH)
+    res = wait_arena_search_done()
+    if not res:
+        logger.info("send cancel search")
+        sender.send_msg(CHAT_WARS_PEER, CANCEL_SEARCH)
+        return
+
+# u'Таблица победителей обновлена'
+# u'Соперник найден'
+# u'Выбери место удара'
+# u'У тебя 30 секунд'
+# u'определиться с защитой'
+
+    options = HITS_DEFS
+    while True:
+        next_options = do_battle_step(sender, options)
+        if not next_options:
+            break
+        options = next_options
+
+
 
 def setup_logger():
     hdlr = logging.StreamHandler(sys.stdout)
@@ -148,9 +247,12 @@ def main():
 
     sender = Sender(host="localhost", port=4458)
 
-    # for i in range(7):
+    # for i in range(5):
     #     do_forest(sender)
     # return
+
+    # do_arena(sender)
+    # return 
 
     # for color in (BLUE, RED, WHITE, YELLOW):
     #     do_attack(sender, color)
@@ -160,6 +262,10 @@ def main():
     # sender.send_msg(CHAT_WARS_PEER, DEFENCE_COMMAND)
     # time.sleep(1)
 
+    # sender.send_msg(CHAT_WARS_PEER, BACK)
+    # time.sleep(1)
+    # return
+
     try:
         while True:
             while not chat_wars_msg_queue.empty():
@@ -168,21 +274,21 @@ def main():
                     do_go(sender)
                     do_attack(sender, DEFAULT_TARGET)
 
-            while not command_chat_msg_queue.empty():
-                msg = command_chat_msg_queue.get()
-                if BLUE in msg.text:
-                    do_attack(sender, BLUE)
-                elif RED in msg.text:
-                    do_attack(sender, RED)
-                elif YELLOW in msg.text:
-                    do_attack(sender, YELLOW)
-                elif WHITE in msg.text:
-                    do_attack(sender, WHITE)
-                elif DEFENCE_COMMAND in msg.text:
-                    do_defence(sender)
+            # while not command_chat_msg_queue.empty():
+            #     msg = command_chat_msg_queue.get()
+            #     if BLUE in msg.text:
+            #         do_attack(sender, BLUE)
+            #     elif RED in msg.text:
+            #         do_attack(sender, RED)
+            #     elif YELLOW in msg.text:
+            #         do_attack(sender, YELLOW)
+            #     elif WHITE in msg.text:
+            #         do_attack(sender, WHITE)
+            #     elif DEFENCE_COMMAND in msg.text:
+            #         do_defence(sender)
 
-            # time.sleep(30)
-            time.sleep(random.randint(20, 40))
+            time.sleep(1)
+            # time.sleep(random.randint(20, 40))
     except:
         logger.exception('bum')
 
