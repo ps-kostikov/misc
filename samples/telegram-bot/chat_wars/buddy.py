@@ -59,11 +59,15 @@ HITS = [
     HIT_TORSO,
     HIT_LEGS,
 ]
-DEFS = []
+DEFS = [
+    DEF_HEAD,
+    DEF_TORSO,
+    DEF_LEGS,
+]
 HITS_DEFS = HITS + DEFS
 # -------
 
-DEFAULT_TARGET = BLUE
+DEFAULT_TARGET = WHITE
 
 @coroutine
 def enqueue_msgs():
@@ -71,17 +75,24 @@ def enqueue_msgs():
         while True:
             msg = (yield)
 
+            if not hasattr(msg, 'event'):
+                continue
+            if not hasattr(msg, 'own'):
+                continue
+            if not hasattr(msg, 'text'):
+                continue
+            if not hasattr(msg, 'sender'):
+                continue
+            if not hasattr(msg.sender, 'username'):
+                continue
+
+
             # print '>>', msg
             if msg.event != "message":
                 continue
             if msg.own:
                 continue
             if msg.text is None:
-                continue
-
-            if not hasattr(msg, 'sender'):
-                continue
-            if not hasattr(msg.sender, 'username'):
                 continue
 
             if msg.sender.username == 'ChatWarsBot':
@@ -113,16 +124,22 @@ def wait_forest_done():
         while not chat_wars_msg_queue.empty():
             msg = chat_wars_msg_queue.get()
             # print msg
-            if u'Вы вернулись из леса' in msg.text or u'Вы заработали' in msg.text:
-                logger.info("wait_forest_done complete")
-                return True
+            exit_options = [
+                u'Вы вернулись из леса',
+                u'Вы заработали',
+                u'Ты заработал',
+            ]
+            for t in exit_options:
+                if t in msg.text:
+                    logger.info("wait_forest_done complete")
+                    return True
         time.sleep(delay)
     logger.info('time is out; quit forest')
     return False
 
 def wait_arena_search_done():
     logger.info('wait_arena_search_done')
-    sec_to_wait = 5 * 60
+    sec_to_wait = 10 * 60
     delay = 10
     for i in range(sec_to_wait / delay):
         while not chat_wars_msg_queue.empty():
@@ -178,13 +195,14 @@ def do_go(sender):
     wait_any()
 
 def do_battle_step(sender, options):
-    logging.info("send hit def")
+    logger.info("send hit def")
     sender.send_msg(CHAT_WARS_PEER, random.choice(options))
     sec_to_wait = 3 * 60
     delay = 1
     for i in range(sec_to_wait / delay):
         while not chat_wars_msg_queue.empty():
             msg = chat_wars_msg_queue.get()
+            print msg.text
             if u'У тебя 30 секунд' in msg.text:
                 return HITS_DEFS
             elif u'Выбери место удара' in msg.text:
@@ -193,6 +211,8 @@ def do_battle_step(sender, options):
                 return DEFS
             elif u'Таблица победителей обновлена' in msg.text:
                 return []
+            elif u'посмотрим что из этого выйдет' in msg.text:
+                continue
             else:
                 logger.info("unexpected battle answer")
                 return HITS_DEFS
@@ -215,6 +235,7 @@ def do_arena(sender):
         sender.send_msg(CHAT_WARS_PEER, CANCEL_SEARCH)
         return
 
+# u'посмотрим что из этого выйдет'
 # u'Таблица победителей обновлена'
 # u'Соперник найден'
 # u'Выбери место удара'
@@ -223,6 +244,7 @@ def do_arena(sender):
 
     options = HITS_DEFS
     while True:
+        print options
         next_options = do_battle_step(sender, options)
         if not next_options:
             break
@@ -245,14 +267,14 @@ def main():
     thread.daemon = True
     thread.start()
 
+    time.sleep(1)
     sender = Sender(host="localhost", port=4458)
 
-    # for i in range(5):
+    # for i in range(6):
     #     do_forest(sender)
     # return
 
-    # do_arena(sender)
-    # return 
+    do_arena(sender)
 
     # for color in (BLUE, RED, WHITE, YELLOW):
     #     do_attack(sender, color)
@@ -272,6 +294,7 @@ def main():
                 msg = chat_wars_msg_queue.get()
                 if GO in msg.text:
                     do_go(sender)
+                    # do_defence(sender)
                     do_attack(sender, DEFAULT_TARGET)
 
             # while not command_chat_msg_queue.empty():
