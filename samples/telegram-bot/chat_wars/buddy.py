@@ -16,8 +16,10 @@ import logging
 import datetime
 import collections
 import re
+import pytz
 
 logger = logging.getLogger("buddy")
+TZ = pytz.timezone('Europe/Moscow')
 
 chat_wars_msg_queue = Queue()
 command_chat_msg_queue = Queue()
@@ -103,9 +105,6 @@ CW_MSG_TYPE_HERO = 'hero'
 CW_MSG_TYPE_UNKNOWN = 'unknown'
 
 #-------------------------------------
-
-DEFAULT_TARGET = BLUE
-
 
 # u'Технические работы'
 # u'посмотрим что из этого выйдет'
@@ -221,7 +220,7 @@ def get_last_msg(queue, queue_id):
     for msg in msgs:
         logger.info(u'msg read from {0!r} at {1}: {2}'.format(
             queue_id,
-            datetime.datetime.fromtimestamp(msg.date),
+            datetime.datetime.fromtimestamp(msg.date, TZ),
             text_to_log(msg.text)))
     return msgs[-1]
 
@@ -237,16 +236,16 @@ def get_last_self_msg():
 def send_msg(text, peer=CHAT_WARS_PEER):
     logger.info(u"send msg to {0!r} at {1}: {2}".format(
         peer,
-        datetime.datetime.now(),
+        datetime.datetime.now(TZ),
         text))
     sender.send_msg(peer, text)
 
 
 def time_to_battle():
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(TZ)
     battle_time = (
         datetime.datetime.combine(
-            datetime.date.today(),
+            datetime.datetime.now(TZ).date(),
             datetime.time.min
         )
         + datetime.timedelta(hours=1)
@@ -374,7 +373,7 @@ def wait_forest_done():
 
 def wait_arena_search_done():
     logger.info('wait_arena_search_done')
-    sec_to_wait = 10 * 60
+    sec_to_wait = 15 * 60
     delay = 10
     for i in range(sec_to_wait / delay):
         msg = get_last_chat_wars_msg()
@@ -481,20 +480,16 @@ def get_hero_status():
 
 
 def do_job():
-    # while True:
-    #     get_last_chat_wars_msg()
-    #     time.sleep(10)
-    # return
 
     # for i in range(8):
     #     do_forest()
     # return
 
-    while True:
-        print get_hero_status()
-        break
-        time.sleep(10)
-    return
+    # while True:
+    #     print get_hero_status()
+    #     break
+    #     time.sleep(10)
+    # return
 
     # print time_to_battle()
     # do_arena()
@@ -515,29 +510,65 @@ def do_job():
     # last_arena_time = None
     # # last_send_time = None
     # last_state = None
-    while True:
-        msg = get_last_chat_wars_msg()
-        if msg is not None:
-            if GO in msg.text:
-                do_go()
-                # do_defence()
-                do_attack(DEFAULT_TARGET)
 
+    last_hs = None
+    desired_battle_state = STATE_ATTACK_RED
+
+    while True:
         msg = get_last_command_chat_msg()
         if msg is not None:
             if BLUE in msg.text:
-                do_attack(BLUE)
+                desired_battle_state = STATE_ATTACK_BLUE
             elif RED in msg.text:
-                do_attack(RED)
+                desired_battle_state = STATE_ATTACK_RED
             elif YELLOW in msg.text:
-                do_attack(YELLOW)
+                desired_battle_state = STATE_ATTACK_YELLOW
             elif WHITE in msg.text:
-                do_attack(WHITE)
+                desired_battle_state = STATE_ATTACK_WHITE
             elif DEFENCE_COMMAND in msg.text:
-                do_defence()
+                desired_battle_state = STATE_DEFENCE
 
-        time.sleep(1)
-        # time.sleep(random.randint(20, 40))
+        ttb = time_to_battle()
+
+        if ttb > datetime.timedelta(minutes=5):
+            msg = get_last_chat_wars_msg()
+            if msg is not None:
+                if GO in msg.text:
+                    do_go()
+                    last_hs = None
+
+            if ttb > datetime.timedelta(hours=1):
+                if last_hs is None:
+                    last_hs = get_hero_status()
+                if last_hs is None:
+                    continue
+
+                if last_hs.stamina >= 5:
+                    for i in range(5):
+                        do_forest()
+                    last_hs = None
+                    continue
+
+        if ttb < datetime.timedelta(minutes=20):
+            if last_hs is None:
+                last_hs = get_hero_status()
+            if last_hs is None:
+                continue
+
+            if last_hs.state != desired_battle_state:
+                state_to_color = {
+                    STATE_ATTACK_RED: RED,
+                    STATE_ATTACK_BLUE: BLUE,
+                    STATE_ATTACK_WHITE: WHITE,
+                    STATE_ATTACK_YELLOW: YELLOW,
+                }
+                if desired_battle_state in state_to_color:
+                    do_attack(state_to_color[desired_battle_state])
+                else:
+                    do_defence()
+
+        # time.sleep(1)
+        time.sleep(random.randint(20, 40))
 
 
 
@@ -571,7 +602,7 @@ def main():
 
                 if buddy_state == BUDDY_STATE_WORKING:
                     do_job()
-                    # for correct no loop do_job
+                    # for correctness if there is no loop in do_job
                     break
 
             except PauseException:
