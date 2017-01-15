@@ -172,16 +172,19 @@ def send_msg(sender, text):
     sender.send_msg(CHAT_WARS_PEER, text)
 
 
-# FIXME use timedelta
-def time_to_battle_min():
+def time_to_battle():
     now = datetime.datetime.now()
-    m_in_h = 60
-    minutes_from_midnight = now.hour * m_in_h + now.minute
-    for h in (1, 4, 7, 10, 13, 16, 19, 22):
-        if minutes_from_midnight < h * m_in_h:
-            return h * m_in_h - minutes_from_midnight
-    else:
-        return 24 * m_in_h - minutes_from_midnight + m_in_h * 1
+    battle_time = (
+        datetime.datetime.combine(
+            datetime.date.today(),
+            datetime.time.min
+        )
+        + datetime.timedelta(hours=1)
+    )
+    battle_gap = datetime.timedelta(hours=3)
+    while battle_time < now:
+        battle_time += battle_gap
+    return battle_time - now
 
 
 def wait_forest_done():
@@ -206,7 +209,7 @@ def wait_forest_done():
 
 def wait_arena_search_done():
     logger.info('wait_arena_search_done')
-    sec_to_wait = 15 * 60
+    sec_to_wait = 20 * 60
     delay = 10
     for i in range(sec_to_wait / delay):
         msg = get_last_chat_wars_msg()
@@ -326,6 +329,9 @@ def setup_logger():
 def main():
     setup_logger()
 
+    # print time_to_battle()
+    # return
+
     thread = threading.Thread(target=run_receiver)
     thread.daemon = True
     thread.start()
@@ -345,7 +351,7 @@ def main():
 
     # wait_any()
     # return
-    print time_to_battle_min()
+    print time_to_battle()
     do_arena(sender)
     return 
 
