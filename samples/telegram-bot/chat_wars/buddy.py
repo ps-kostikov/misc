@@ -21,8 +21,13 @@ logger = logging.getLogger("buddy")
 
 chat_wars_msg_queue = Queue()
 command_chat_msg_queue = Queue()
+self_msg_queue = Queue()
 
 CHAT_WARS_PEER = 'Chat_Wars'
+SELF_PEER = 'Pavel_Kostikov'
+
+sender = None
+
 
 # checked
 FOREST = u"🌲Лес"
@@ -42,14 +47,6 @@ ARENA = u'📯Арена'
 DO_SEARCH = u'🔎Поиск соперника'
 CANCEL_SEARCH = u'✖️Отменить поиск'
 
-# ------ not checked
-BLACK = u'🇬🇵'
-
-BACK = u'⬅️Назад'
-KOROVANY = u'🐫ГРАБИТЬ КОРОВАНЫ'
-
-TAVERN = u'🍺Таверна'
-
 HIT_HEAD = u'🗡в голову'
 HIT_TORSO = u'🗡по корпусу'
 HIT_LEGS = u'🗡по ногам'
@@ -68,12 +65,17 @@ DEFS = [
     DEF_LEGS,
 ]
 HITS_DEFS = HITS + DEFS
-# -------
 
-DEFAULT_TARGET = BLUE
+# ------ not checked
+BLACK = u'🇬🇵'
 
+BACK = u'⬅️Назад'
+KOROVANY = u'🐫ГРАБИТЬ КОРОВАНЫ'
+
+TAVERN = u'🍺Таверна'
 
 #---------------------------
+
 STATE_REST = 'rest'
 STATE_ATTACK_RED = 'attack_red'
 STATE_ATTACK_BLUE = 'attack_blue'
@@ -100,6 +102,30 @@ HeroStatus = collections.namedtuple("HeroStatus", "team gold stamina stamina_max
 CW_MSG_TYPE_HERO = 'hero'
 CW_MSG_TYPE_UNKNOWN = 'unknown'
 
+#-------------------------------------
+
+DEFAULT_TARGET = BLUE
+
+
+# u'Технические работы'
+# u'посмотрим что из этого выйдет'
+# u'Таблица победителей обновлена'
+# u'Соперник найден'
+# u'Выбери место удара'
+# u'У тебя 30 секунд'
+# u'определиться с защитой'
+
+
+BUDDY_STATE_WORKING = 'working'
+BUDDY_STATE_PAUSED = 'paused'
+
+buddy_state = None
+
+class PauseException(Exception):
+    pass
+
+#-----------------------------------
+
 
 @coroutine
 def enqueue_msgs():
@@ -124,8 +150,8 @@ def enqueue_msgs():
             # print '>>', msg
             if msg.event != "message":
                 continue
-            if msg.own:
-                continue
+            # if msg.own:
+            #     continue
             if msg.text is None:
                 continue
 
@@ -133,6 +159,8 @@ def enqueue_msgs():
                 chat_wars_msg_queue.put(msg)
             if msg.sender.username == 'blackcastlebot':
                 command_chat_msg_queue.put(msg)
+            if msg.sender.username == 'ps_kostikov' and msg.text.lower().startswith(u'com'):
+                self_msg_queue.put(msg)
     except:
         logger.exception("receiver dies")
     # except GeneratorExit:
@@ -149,7 +177,34 @@ def run_receiver():
     receiver.message(enqueue_msgs())
     receiver.stop()
 
+
+def send_buddy_status():
+    send_msg("I'm " + buddy_state, SELF_PEER)
+
+def do_control_stuff():
+    global buddy_state
+
+    if self_msg_queue.empty():
+        return
+    while not self_msg_queue.empty():
+        last_msg = self_msg_queue.get()
+    text = last_msg.text
+    if text.endswith('s'):
+        send_buddy_status()
+    elif text.endswith('p'):
+        if buddy_state == BUDDY_STATE_WORKING:
+            raise PauseException()
+        send_buddy_status()
+    elif text.endswith('c'):
+        if buddy_state == BUDDY_STATE_PAUSED:
+            buddy_state = BUDDY_STATE_WORKING
+        send_buddy_status()
+    else:
+        send_msg("I don't understand", SELF_PEER)
+
 def get_last_msg(queue, queue_id):
+    do_control_stuff()
+
     msgs = []
     while not queue.empty():
         msgs.append(queue.get())
@@ -176,11 +231,15 @@ def get_last_chat_wars_msg():
 def get_last_command_chat_msg():
     return get_last_msg(command_chat_msg_queue, 'command chat')
 
-def send_msg(sender, text):
-    logger.info(u"send msg to 'chat wars' at {0}: {1}".format(
+def get_last_self_msg():
+    return get_last_msg(self_msg_queue, 'self')
+
+def send_msg(text, peer=CHAT_WARS_PEER):
+    logger.info(u"send msg to {0!r} at {1}: {2}".format(
+        peer,
         datetime.datetime.now(),
         text))
-    sender.send_msg(CHAT_WARS_PEER, text)
+    sender.send_msg(peer, text)
 
 
 def time_to_battle():
@@ -196,7 +255,6 @@ def time_to_battle():
     while battle_time < now:
         battle_time += battle_gap
     return battle_time - now
-
 
 
 
@@ -316,7 +374,7 @@ def wait_forest_done():
 
 def wait_arena_search_done():
     logger.info('wait_arena_search_done')
-    sec_to_wait = 20 * 60
+    sec_to_wait = 10 * 60
     delay = 10
     for i in range(sec_to_wait / delay):
         msg = get_last_chat_wars_msg()
@@ -347,29 +405,29 @@ def wait_any():
 
 
 
-def do_forest(sender):
-    send_msg(sender, QUESTS)
+def do_forest():
+    send_msg(QUESTS)
     wait_any()
-    send_msg(sender, FOREST)
+    send_msg(FOREST)
     wait_forest_done()
 
-def do_attack(sender, color):
-    send_msg(sender, ATTACK)
+def do_attack(color):
+    send_msg(ATTACK)
     wait_any()
-    send_msg(sender, color)
-    wait_any()
-
-def do_defence(sender):
-    send_msg(sender, DEFENCE)
+    send_msg(color)
     wait_any()
 
-def do_go(sender):
-    send_msg(sender, GO)
+def do_defence():
+    send_msg(DEFENCE)
+    wait_any()
+
+def do_go():
+    send_msg(GO)
     wait_any()
     wait_any()
 
-def do_battle_step(sender, options):
-    send_msg(sender, random.choice(options))
+def do_battle_step(options):
+    send_msg(random.choice(options))
     sec_to_wait = 3 * 60
     delay = 3
     for i in range(sec_to_wait / delay):
@@ -392,34 +450,26 @@ def do_battle_step(sender, options):
     logger.info('time is out; quit battle step')
     return []
 
-def do_arena(sender):
-    send_msg(sender, CASTLE)
+def do_arena():
+    send_msg(CASTLE)
     wait_any()
-    send_msg(sender, ARENA)
+    send_msg(ARENA)
     wait_any()
-    send_msg(sender, DO_SEARCH)
+    send_msg(DO_SEARCH)
     res = wait_arena_search_done()
     if not res:
-        send_msg(sender, CANCEL_SEARCH)
+        send_msg(CANCEL_SEARCH)
         return
-
-# u'Технические работы'
-# u'посмотрим что из этого выйдет'
-# u'Таблица победителей обновлена'
-# u'Соперник найден'
-# u'Выбери место удара'
-# u'У тебя 30 секунд'
-# u'определиться с защитой'
 
     options = HITS_DEFS
     while True:
-        next_options = do_battle_step(sender, options)
+        next_options = do_battle_step(options)
         if not next_options:
             break
         options = next_options
 
-def get_hero_status(sender):
-    send_msg(sender, HERO)
+def get_hero_status():
+    send_msg(HERO)
     sec_to_wait = 5 * 60
     delay = 3
     for i in range(sec_to_wait / delay):
@@ -428,6 +478,67 @@ def get_hero_status(sender):
             return parse_hero_status(msg.text)
         time.sleep(delay)
     return None
+
+
+def do_job():
+    # while True:
+    #     get_last_chat_wars_msg()
+    #     time.sleep(10)
+    # return
+
+    # for i in range(8):
+    #     do_forest()
+    # return
+
+    while True:
+        print get_hero_status()
+        break
+        time.sleep(10)
+    return
+
+    # print time_to_battle()
+    # do_arena()
+    # return 
+
+    # for color in (BLUE, RED, WHITE, YELLOW):
+    #     do_attack(color)
+
+    # do_defence()
+
+    # send_msg(DEFENCE_COMMAND)
+    # time.sleep(1)
+
+    # send_msg(BACK)
+    # time.sleep(1)
+    # return
+
+    # last_arena_time = None
+    # # last_send_time = None
+    # last_state = None
+    while True:
+        msg = get_last_chat_wars_msg()
+        if msg is not None:
+            if GO in msg.text:
+                do_go()
+                # do_defence()
+                do_attack(DEFAULT_TARGET)
+
+        msg = get_last_command_chat_msg()
+        if msg is not None:
+            if BLUE in msg.text:
+                do_attack(BLUE)
+            elif RED in msg.text:
+                do_attack(RED)
+            elif YELLOW in msg.text:
+                do_attack(YELLOW)
+            elif WHITE in msg.text:
+                do_attack(WHITE)
+            elif DEFENCE_COMMAND in msg.text:
+                do_defence()
+
+        time.sleep(1)
+        # time.sleep(random.randint(20, 40))
+
 
 
 def setup_logger():
@@ -441,71 +552,38 @@ def setup_logger():
 def main():
     setup_logger()
 
-    # print time_to_battle()
-    # return
-
     thread = threading.Thread(target=run_receiver)
     thread.daemon = True
     thread.start()
 
     time.sleep(1)
+    global sender
     sender = Sender(host="localhost", port=4458)
 
-    # while True:
-    #     get_last_chat_wars_msg()
-    #     time.sleep(10)
-    # return
 
-
-    # for i in range(8):
-    #     do_forest(sender)
-    # return
-
-    print get_hero_status(sender)
-    return
-
-    # print time_to_battle()
-    # do_arena(sender)
-    # return 
-
-    # for color in (BLUE, RED, WHITE, YELLOW):
-    #     do_attack(sender, color)
-
-    # do_defence(sender)
-
-    # send_msg(sender, DEFENCE_COMMAND)
-    # time.sleep(1)
-
-    # send_msg(sender, BACK)
-    # time.sleep(1)
-    # return
-
+    send_msg("info: I'm started", SELF_PEER)
+    global buddy_state
+    buddy_state = BUDDY_STATE_WORKING
     try:
         while True:
-            msg = get_last_chat_wars_msg()
-            if msg is not None:
-                if GO in msg.text:
-                    do_go(sender)
-                    # do_defence(sender)
-                    do_attack(sender, DEFAULT_TARGET)
+            try:
+                do_control_stuff()
 
-            msg = get_last_command_chat_msg()
-            if msg is not None:
-                if BLUE in msg.text:
-                    do_attack(sender, BLUE)
-                elif RED in msg.text:
-                    do_attack(sender, RED)
-                elif YELLOW in msg.text:
-                    do_attack(sender, YELLOW)
-                elif WHITE in msg.text:
-                    do_attack(sender, WHITE)
-                elif DEFENCE_COMMAND in msg.text:
-                    do_defence(sender)
+                if buddy_state == BUDDY_STATE_WORKING:
+                    do_job()
+                    # for correct no loop do_job
+                    break
 
-            # time.sleep(1)
-            time.sleep(random.randint(20, 40))
+            except PauseException:
+                buddy_state = BUDDY_STATE_PAUSED
+                send_buddy_status()
+
+            time.sleep(1)
     except:
-        logger.exception('bum')
-
+        send_msg("info: I'm crashed", SELF_PEER)
+        logger.exception('total crash')
+    else:
+        send_msg("info: I'm finished", SELF_PEER)
+    
 if __name__ == '__main__':
     main()
