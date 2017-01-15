@@ -153,7 +153,6 @@ def get_last_msg(queue, queue_id):
             return parts[0]
         return parts[0] + u' ...'
     for msg in msgs:
-        print msg
         logger.info(u'msg read from {0!r} at {1}: {2}'.format(
             queue_id,
             datetime.datetime.fromtimestamp(msg.date),
@@ -162,6 +161,16 @@ def get_last_msg(queue, queue_id):
 
 def get_last_chat_wars_msg():
     return get_last_msg(chat_wars_msg_queue, 'chat wars')
+
+def get_last_command_chat_msg():
+    return get_last_msg(command_chat_msg_queue, 'command chat')
+
+def send_msg(sender, text):
+    logger.info(u"send msg to 'chat wars' at {0}: {1}".format(
+        datetime.datetime.now(),
+        text))
+    sender.send_msg(CHAT_WARS_PEER, text)
+
 
 # FIXME use timedelta
 def time_to_battle_min():
@@ -180,9 +189,8 @@ def wait_forest_done():
     sec_to_wait = 15 * 60
     delay = 10
     for i in range(sec_to_wait / delay):
-        while not chat_wars_msg_queue.empty():
-            msg = chat_wars_msg_queue.get()
-            # print msg
+        msg = get_last_chat_wars_msg()
+        if msg is not None:
             exit_options = [
                 u'Вы вернулись из леса',
                 u'Вы заработали',
@@ -201,8 +209,8 @@ def wait_arena_search_done():
     sec_to_wait = 15 * 60
     delay = 10
     for i in range(sec_to_wait / delay):
-        while not chat_wars_msg_queue.empty():
-            msg = chat_wars_msg_queue.get()
+        msg = get_last_chat_wars_msg()
+        if msg is not None:
             if u'У тебя 30 секунд' in msg.text:
                 logger.info("wait_arena_search_done complete")
                 return True
@@ -218,8 +226,8 @@ def wait_any():
     sec_to_wait = 15 * 60
     delay = 10
     for i in range(sec_to_wait / delay):
-        while not chat_wars_msg_queue.empty():
-            msg = chat_wars_msg_queue.get()
+        msg = get_last_chat_wars_msg()
+        if msg is not None:
             logger.info("wait any complete")
             return True
         time.sleep(delay)
@@ -230,41 +238,34 @@ def wait_any():
 
 
 def do_forest(sender):
-    logger.info("send quests")
-    sender.send_msg(CHAT_WARS_PEER, QUESTS)
+    send_msg(sender, QUESTS)
     wait_any()
-    logger.info("send forest")
-    sender.send_msg(CHAT_WARS_PEER, FOREST)
+    send_msg(sender, FOREST)
     wait_forest_done()
 
 def do_attack(sender, color):
-    logger.info("send attack")
-    sender.send_msg(CHAT_WARS_PEER, ATTACK)
+    send_msg(sender, ATTACK)
     wait_any()
-    logger.info("send flag")
-    sender.send_msg(CHAT_WARS_PEER, color)
+    send_msg(sender, color)
     wait_any()
 
 def do_defence(sender):
-    logger.info("send defence")
-    sender.send_msg(CHAT_WARS_PEER, DEFENCE)
+    send_msg(sender, DEFENCE)
     wait_any()
 
 def do_go(sender):
-    logger.info("send go")
-    sender.send_msg(CHAT_WARS_PEER, GO)
+    send_msg(sender, GO)
     wait_any()
     wait_any()
 
 def do_battle_step(sender, options):
-    logger.info("send hit def")
-    sender.send_msg(CHAT_WARS_PEER, random.choice(options))
+    send_msg(sender, random.choice(options))
     sec_to_wait = 3 * 60
     delay = 3
     for i in range(sec_to_wait / delay):
-        while not chat_wars_msg_queue.empty():
-            msg = chat_wars_msg_queue.get()
-            print msg.text
+        msg = get_last_chat_wars_msg()
+        if msg is not None:
+            # print msg.text
             if u'У тебя 30 секунд' in msg.text:
                 return HITS_DEFS
             elif u'Выбери место удара' in msg.text:
@@ -283,18 +284,14 @@ def do_battle_step(sender, options):
     return []
 
 def do_arena(sender):
-    logger.info("send castle")
-    sender.send_msg(CHAT_WARS_PEER, CASTLE)
+    send_msg(sender, CASTLE)
     wait_any()
-    logger.info("send arena")
-    sender.send_msg(CHAT_WARS_PEER, ARENA)
+    send_msg(sender, ARENA)
     wait_any()
-    logger.info("send search")
-    sender.send_msg(CHAT_WARS_PEER, DO_SEARCH)
+    send_msg(sender, DO_SEARCH)
     res = wait_arena_search_done()
     if not res:
-        logger.info("send cancel search")
-        sender.send_msg(CHAT_WARS_PEER, CANCEL_SEARCH)
+        send_msg(sender, CANCEL_SEARCH)
         return
 
 # u'Технические работы'
@@ -346,6 +343,8 @@ def main():
     #     do_forest(sender)
     # return
 
+    # wait_any()
+    # return
     print time_to_battle_min()
     do_arena(sender)
     return 
@@ -355,24 +354,24 @@ def main():
 
     # do_defence(sender)
 
-    # sender.send_msg(CHAT_WARS_PEER, DEFENCE_COMMAND)
+    # send_msg(sender, DEFENCE_COMMAND)
     # time.sleep(1)
 
-    # sender.send_msg(CHAT_WARS_PEER, BACK)
+    # send_msg(sender, BACK)
     # time.sleep(1)
     # return
 
     try:
         while True:
-            while not chat_wars_msg_queue.empty():
-                msg = chat_wars_msg_queue.get()
+            msg = get_last_chat_wars_msg()
+            if msg is not None:
                 if GO in msg.text:
                     do_go(sender)
                     # do_defence(sender)
                     do_attack(sender, DEFAULT_TARGET)
 
-            while not command_chat_msg_queue.empty():
-                msg = command_chat_msg_queue.get()
+            msg = get_last_command_chat_msg()
+            if msg is not None:
                 if BLUE in msg.text:
                     do_attack(sender, BLUE)
                 elif RED in msg.text:
