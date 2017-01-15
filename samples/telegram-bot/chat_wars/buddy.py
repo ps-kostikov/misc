@@ -15,6 +15,7 @@ import random
 import logging
 import datetime
 import collections
+import re
 
 logger = logging.getLogger("buddy")
 
@@ -71,6 +72,8 @@ HITS_DEFS = HITS + DEFS
 
 DEFAULT_TARGET = BLUE
 
+
+#---------------------------
 STATE_REST = 'rest'
 STATE_ATTACK_RED = 'attack_red'
 STATE_ATTACK_BLUE = 'attack_blue'
@@ -81,8 +84,16 @@ STATE_DEFENCE = 'defence'
 STATE_FOREST = 'forest'
 STATE_KOROVANY = 'korovany'
 STATE_ARENA = 'arena'
+STATE_UNKNOWN = 'unknown'
 
-HeroStatus = collections.namedtuple("HeroStatus", "gold stamina stamina_max state")
+TEAM_RED = 'red'
+TEAM_BLUE = 'blue'
+TEAM_WHITE = 'white'
+TEAM_YELLOW = 'yellow'
+TEAM_BLACK = 'black'
+TEAM_UNKNOWN = 'unknown'
+
+HeroStatus = collections.namedtuple("HeroStatus", "team gold stamina stamina_max state")
 
 
 # TODO fill all possible msg types
@@ -187,6 +198,102 @@ def time_to_battle():
     return battle_time - now
 
 
+
+
+def parse_hero_status(text):
+
+    team = None
+    gold = None
+    stamina = None
+    stamina_max = None
+    state = None
+
+    def split_stat(s):
+        parts = map(int, s.split('+'))
+        if len(parts) == 1:
+            return parts[0], 0
+        return parts[0], parts[1]
+
+    for line in text.split('\n'):
+        match = re.match(u'..(.*),\s+Воин\s+(\W+)\s+замка.*', line)
+        if match is not None:
+            _, castle_word = match.groups()
+            word_to_team = {
+                u'Черного': TEAM_BLACK,
+                u'Белого': TEAM_WHITE,
+                u'Синего': TEAM_BLUE,
+                u'Желтого': TEAM_YELLOW,
+                u'Красного': TEAM_RED,
+            }
+            if castle_word in word_to_team.keys():
+                team = word_to_team[castle_word]
+            continue
+
+        match = re.match(u'.*Золото:\s+(\d+).*', line)
+        if match is not None:
+            gold = int(match.groups()[0])
+            continue
+
+        match = re.match(u'.*Выносливость:\s+(\d+)\s+из\s+([\d\+]+).*', line)
+        if match is not None:
+            stamina = int(match.groups()[0])
+            stamina_max = sum(split_stat(match.groups()[1]))
+            continue
+
+        match = re.match(u'.*Атака на\s+..(\W+)\s+замок.*', line)
+        if match is not None:
+            castle_word = match.groups()[0]
+            word_to_state = {
+                u'Черный': STATE_ATTACK_BLACK,
+                u'Белый': STATE_ATTACK_WHITE,
+                u'Синий': STATE_ATTACK_BLUE,
+                u'Желтый': STATE_ATTACK_YELLOW,
+                u'Красный': STATE_ATTACK_RED,
+            }
+            if castle_word in word_to_state.keys():
+                state = word_to_state[castle_word]
+            continue
+
+        match = re.match(u'.*Защита\s+своего\s+замка.*', line)
+        if match is not None:
+            state = STATE_DEFENCE
+            continue
+
+        match = re.match(u'.*В\s+лесу.*', line)
+        if match is not None:
+            state = STATE_FOREST
+            continue
+
+        match = re.match(u'.*Возишься\s+с\s+КОРОВАНАМИ.*', line)
+        if match is not None:
+            state = STATE_KOROVANY
+            continue
+
+        match = re.match(u'.*На\s+арене.*', line)
+        if match is not None:
+            state = STATE_ARENA
+            continue
+
+        match = re.match(u'.*Отдых.*', line)
+        if match is not None:
+            state = 'rest'
+            continue
+
+    if team is None:
+        team = TEAM_UNKNOWN
+    if state is None:
+        state = STATE_UNKNOWN
+
+    if None in (team, gold, stamina, stamina_max, state):
+        raise RuntimeError("Can not parse hero text")
+
+    return HeroStatus(
+        team=team,
+        gold=gold,
+        stamina=stamina,
+        stamina_max=stamina_max,
+        state=state)
+
 def wait_forest_done():
     logger.info('wait_forest_done')
     sec_to_wait = 15 * 60
@@ -268,7 +375,6 @@ def do_battle_step(sender, options):
     for i in range(sec_to_wait / delay):
         msg = get_last_chat_wars_msg()
         if msg is not None:
-            # print msg.text
             if u'У тебя 30 секунд' in msg.text:
                 return HITS_DEFS
             elif u'Выбери место удара' in msg.text:
@@ -307,15 +413,21 @@ def do_arena(sender):
 
     options = HITS_DEFS
     while True:
-        print options
         next_options = do_battle_step(sender, options)
         if not next_options:
             break
         options = next_options
 
 def get_hero_status(sender):
-    # TODO
-    pass
+    send_msg(sender, HERO)
+    sec_to_wait = 5 * 60
+    delay = 3
+    for i in range(sec_to_wait / delay):
+        msg = get_last_chat_wars_msg()
+        if msg is not None:
+            return parse_hero_status(msg.text)
+        time.sleep(delay)
+    return None
 
 
 def setup_logger():
@@ -349,11 +461,12 @@ def main():
     #     do_forest(sender)
     # return
 
-    # wait_any()
-    # return
-    print time_to_battle()
-    do_arena(sender)
-    return 
+    print get_hero_status(sender)
+    return
+
+    # print time_to_battle()
+    # do_arena(sender)
+    # return 
 
     # for color in (BLUE, RED, WHITE, YELLOW):
     #     do_attack(sender, color)
