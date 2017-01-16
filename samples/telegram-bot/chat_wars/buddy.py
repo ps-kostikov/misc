@@ -242,10 +242,11 @@ def send_msg(text, peer=CHAT_WARS_PEER):
 
 
 def time_to_battle():
-    now = datetime.datetime.now(TZ)
+    # looks like it works only because of Moscow = UTC+3 - exactly battle_gap
+    now = datetime.datetime.now()
     battle_time = (
         datetime.datetime.combine(
-            datetime.datetime.now(TZ).date(),
+            datetime.date.today(),
             datetime.time.min
         )
         + datetime.timedelta(hours=1)
@@ -342,7 +343,8 @@ def parse_hero_status(text):
         state = STATE_UNKNOWN
 
     if None in (team, gold, stamina, stamina_max, state):
-        raise RuntimeError("Can not parse hero text")
+        logger.warn("Can not parse hero text")
+        return None
 
     return HeroStatus(
         team=team,
@@ -373,7 +375,7 @@ def wait_forest_done():
 
 def wait_arena_search_done():
     logger.info('wait_arena_search_done')
-    sec_to_wait = 15 * 60
+    sec_to_wait = 20 * 60
     delay = 10
     for i in range(sec_to_wait / delay):
         msg = get_last_chat_wars_msg()
@@ -390,7 +392,7 @@ def wait_arena_search_done():
 
 def wait_any():
     logger.info('wait any')
-    sec_to_wait = 15 * 60
+    sec_to_wait = 5 * 60
     delay = 10
     for i in range(sec_to_wait / delay):
         msg = get_last_chat_wars_msg()
@@ -486,6 +488,7 @@ def do_job():
     # return
 
     # while True:
+    #     print time_to_battle()
     #     print get_hero_status()
     #     break
     #     time.sleep(10)
@@ -511,6 +514,7 @@ def do_job():
     # # last_send_time = None
     # last_state = None
 
+    last_arena_time = None
     last_hs = None
     desired_battle_state = STATE_ATTACK_RED
 
@@ -529,6 +533,7 @@ def do_job():
                 desired_battle_state = STATE_DEFENCE
 
         ttb = time_to_battle()
+        now = datetime.datetime.now(TZ)
 
         if ttb > datetime.timedelta(minutes=5):
             msg = get_last_chat_wars_msg()
@@ -543,10 +548,16 @@ def do_job():
                 if last_hs is None:
                     continue
 
-                if last_hs.stamina >= 5:
-                    for i in range(5):
-                        do_forest()
+                if last_hs.stamina >= 1:
+                    do_forest()
                     last_hs = None
+                    continue
+
+            if ttb > datetime.timedelta(minutes=40):
+                if last_arena_time is None or now - last_arena_time > datetime.timedelta(minutes=61):
+                    do_arena()
+                    last_hs = None
+                    last_arena_time = datetime.datetime.now(TZ)
                     continue
 
         if ttb < datetime.timedelta(minutes=20):
@@ -566,6 +577,7 @@ def do_job():
                     do_attack(state_to_color[desired_battle_state])
                 else:
                     do_defence()
+                last_hs = None
 
         # time.sleep(1)
         time.sleep(random.randint(20, 40))
@@ -574,6 +586,7 @@ def do_job():
 
 def setup_logger():
     hdlr = logging.StreamHandler(sys.stdout)
+    # FIXME correct output taking timezone in account
     formatter = logging.Formatter('%(asctime)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
