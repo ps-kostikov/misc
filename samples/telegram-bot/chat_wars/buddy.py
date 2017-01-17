@@ -364,6 +364,7 @@ def wait_forest_done():
                 u'Вы вернулись из леса',
                 u'Вы заработали',
                 u'Ты заработал',
+                u'В лесу ты отдохнул',
             ]
             for t in exit_options:
                 if t in msg.text:
@@ -373,9 +374,9 @@ def wait_forest_done():
     logger.info('time is out; quit forest')
     return False
 
-def wait_arena_search_done():
-    logger.info('wait_arena_search_done')
-    sec_to_wait = 20 * 60
+def wait_arena_search_done(min_to_wait):
+    logger.info('wait_arena_search_done {0} minutes'.format(min_to_wait))
+    sec_to_wait = min_to_wait * 60
     delay = 10
     for i in range(sec_to_wait / delay):
         msg = get_last_chat_wars_msg()
@@ -451,16 +452,16 @@ def do_battle_step(options):
     logger.info('time is out; quit battle step')
     return []
 
-def do_arena():
+def do_arena(min_to_wait):
     send_msg(CASTLE)
     wait_any()
     send_msg(ARENA)
     wait_any()
     send_msg(DO_SEARCH)
-    res = wait_arena_search_done()
+    res = wait_arena_search_done(min_to_wait)
     if not res:
         send_msg(CANCEL_SEARCH)
-        return
+        return False
 
     options = HITS_DEFS
     while True:
@@ -468,6 +469,7 @@ def do_arena():
         if not next_options:
             break
         options = next_options
+    return True
 
 def get_hero_status():
     send_msg(HERO)
@@ -495,7 +497,7 @@ def do_job():
     # return
 
     # print time_to_battle()
-    # do_arena()
+    # do_arena(20)
     # return 
 
     # for color in (BLUE, RED, WHITE, YELLOW):
@@ -535,12 +537,29 @@ def do_job():
         ttb = time_to_battle()
         now = datetime.datetime.now(TZ)
 
-        if ttb > datetime.timedelta(minutes=5):
+        if ttb > datetime.timedelta(minutes=5) and ttb < datetime.timedelta(hours=2, minutes=55):
             msg = get_last_chat_wars_msg()
             if msg is not None:
                 if GO in msg.text:
                     do_go()
                     last_hs = None
+
+            if ttb > datetime.timedelta(minutes=12):
+                if last_arena_time is None or now - last_arena_time > datetime.timedelta(minutes=61):
+
+                    min_to_wait = 20
+                    if ttb < datetime.timedelta(minutes=30):
+                        min_to_wait = max(1, ttb.seconds / 60 - 12)
+
+                    arena_result = do_arena(min_to_wait)
+                    if arena_result:
+                        last_arena_time = datetime.datetime.now(TZ)
+                    else:
+                        if last_arena_time is None:
+                            # FIXME eval precise last_arena_time from history
+                            last_arena_time = datetime.datetime.now(TZ) - datetime.timedelta(minutes=30)
+                    last_hs = None
+                    continue
 
             if ttb > datetime.timedelta(hours=1):
                 if last_hs is None:
@@ -548,17 +567,11 @@ def do_job():
                 if last_hs is None:
                     continue
 
-                if last_hs.stamina >= 1:
+                if last_hs.stamina >= 3:
                     do_forest()
                     last_hs = None
                     continue
 
-            if ttb > datetime.timedelta(minutes=40):
-                if last_arena_time is None or now - last_arena_time > datetime.timedelta(minutes=61):
-                    do_arena()
-                    last_hs = None
-                    last_arena_time = datetime.datetime.now(TZ)
-                    continue
 
         if ttb < datetime.timedelta(minutes=20):
             if last_hs is None:
