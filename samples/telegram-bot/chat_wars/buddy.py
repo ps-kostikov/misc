@@ -16,6 +16,7 @@ import logging
 import datetime
 import collections
 import re
+import os
 import pytz
 
 logger = logging.getLogger("buddy")
@@ -75,6 +76,7 @@ BACK = u'⬅️Назад'
 KOROVANY = u'🐫ГРАБИТЬ КОРОВАНЫ'
 
 TAVERN = u'🍺Таверна'
+TAKE_ELL = u'🍺Взять кружку эля'
 
 #---------------------------
 
@@ -86,6 +88,7 @@ STATE_ATTACK_YELLOW = 'attack_yellow'
 STATE_ATTACK_BLACK = 'attack_black'
 STATE_DEFENCE = 'defence'
 STATE_FOREST = 'forest'
+STATE_TAVERN = 'tavern'
 STATE_KOROVANY = 'korovany'
 STATE_ARENA = 'arena'
 STATE_UNKNOWN = 'unknown'
@@ -257,6 +260,22 @@ def time_to_battle():
     return battle_time - now
 
 
+RECIPES_FILE = 'recipes.txt'
+def append_recipe_candidate(text):
+    delim = '\n\n\n'
+    encoding = 'utf-8'
+    if os.path.exists(RECIPES_FILE):
+        with open(RECIPES_FILE) as inf:
+            data = inf.read().decode(encoding)
+            recipes = set(data.split(delim))
+    else:
+        recipes = set()
+
+    recipes.add(text)
+    with open(RECIPES_FILE, 'w') as outf:
+        data = delim.join(recipes)
+        outf.write(data.encode(encoding))
+
 
 def parse_hero_status(text):
 
@@ -332,6 +351,11 @@ def parse_hero_status(text):
             state = STATE_ARENA
             continue
 
+        match = re.match(u'.*Пьешь\sв\s+таверне.*', line)
+        if match is not None:
+            state = STATE_TAVERN
+            continue
+
         match = re.match(u'.*Отдых.*', line)
         if match is not None:
             state = 'rest'
@@ -391,19 +415,32 @@ def wait_arena_search_done(min_to_wait):
 
     return False
 
-def wait_any():
+def wait_any(delay=5):
     logger.info('wait any')
     sec_to_wait = 5 * 60
-    delay = 10
     for i in range(sec_to_wait / delay):
         msg = get_last_chat_wars_msg()
         if msg is not None:
             logger.info("wait any complete")
             return True
         time.sleep(delay)
-    logger.info('time is out; quit forest')
+    logger.info('time is out; quit wait')
     return False
 
+
+def wait_any_and_save(min_to_wait):
+    logger.info('wait any and save')
+    sec_to_wait = min_to_wait * 60
+    delay = 10
+    for i in range(sec_to_wait / delay):
+        msg = get_last_chat_wars_msg()
+        if msg is not None:
+            append_recipe_candidate(msg.text)
+            logger.info("wait any and save complete")
+            return True
+        time.sleep(delay)
+    logger.info('time is out; quit wait')
+    return False
 
 
 
@@ -471,6 +508,16 @@ def do_arena(min_to_wait):
         options = next_options
     return True
 
+def do_tavern():
+    send_msg(CASTLE)
+    wait_any()
+    send_msg(TAVERN)
+    wait_any()
+    send_msg(TAKE_ELL)
+    wait_any_and_save(min_to_wait=2)
+    wait_any_and_save(min_to_wait=10)
+
+
 def get_hero_status():
     send_msg(HERO)
     sec_to_wait = 5 * 60
@@ -484,6 +531,9 @@ def get_hero_status():
 
 
 def do_job():
+    # append_recipe_candidate(TAVERN)
+    # append_recipe_candidate(CASTLE)
+    # return
 
     # for i in range(8):
     #     do_forest()
@@ -517,6 +567,7 @@ def do_job():
     # last_state = None
 
     last_arena_time = None
+    last_tavern_time = None
     last_hs = None
     desired_battle_state = STATE_ATTACK_RED
 
@@ -571,6 +622,19 @@ def do_job():
                     do_forest()
                     last_hs = None
                     continue
+
+            if ttb > datetime.timedelta(minutes=30) and (now.hour >= 19 or now.hour < 7):
+                if last_tavern_time is None or now - last_tavern_time > datetime.timedelta(minutes=3):
+                    if last_hs is None:
+                        last_hs = get_hero_status()
+                    if last_hs is None:
+                        continue
+
+                    if last_hs.gold >= 100:
+                        last_tavern_time = datetime.datetime.now(TZ)
+                        do_tavern()
+                        last_hs = None
+                        continue
 
 
         if ttb < datetime.timedelta(minutes=20):
