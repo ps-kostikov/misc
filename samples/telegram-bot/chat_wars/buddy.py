@@ -569,7 +569,9 @@ def do_job():
     last_arena_time = None
     last_tavern_time = None
     last_hs = None
-    desired_battle_state = STATE_ATTACK_RED
+    desired_battle_state = STATE_DEFENCE
+
+    cry_set = True
 
     while True:
         msg = get_last_command_chat_msg()
@@ -582,11 +584,19 @@ def do_job():
                 desired_battle_state = STATE_ATTACK_YELLOW
             elif WHITE in msg.text:
                 desired_battle_state = STATE_ATTACK_WHITE
-            elif DEFENCE_COMMAND in msg.text:
+            elif DEFENCE_COMMAND in msg.text or BLACK in msg.text:
                 desired_battle_state = STATE_DEFENCE
 
         ttb = time_to_battle()
         now = datetime.datetime.now(TZ)
+
+        if ttb > datetime.timedelta(minutes=15) and ttb < datetime.timedelta(hours=2, minutes=45) and cry_set:
+            if (now.hour >= 19 or now.hour < 7):
+                send_msg(u'Пойду напьюсь')
+            else:
+                send_msg(u'На арену что ли сходить')
+            wait_any()
+            cry_set = False
 
         if ttb > datetime.timedelta(minutes=5) and ttb < datetime.timedelta(hours=2, minutes=55):
             msg = get_last_chat_wars_msg()
@@ -595,12 +605,12 @@ def do_job():
                     do_go()
                     last_hs = None
 
-            if ttb > datetime.timedelta(minutes=12):
+            if ttb > datetime.timedelta(minutes=15) and now.hour >= 6:
                 if last_arena_time is None or now - last_arena_time > datetime.timedelta(minutes=61):
 
                     min_to_wait = 20
-                    if ttb < datetime.timedelta(minutes=30):
-                        min_to_wait = max(1, ttb.seconds / 60 - 12)
+                    if ttb < datetime.timedelta(minutes=35):
+                        min_to_wait = max(1, ttb.seconds / 60 - 15)
 
                     arena_result = do_arena(min_to_wait)
                     if arena_result:
@@ -637,7 +647,7 @@ def do_job():
                         continue
 
 
-        if ttb < datetime.timedelta(minutes=20):
+        if ttb < datetime.timedelta(minutes=10):
             if last_hs is None:
                 last_hs = get_hero_status()
             if last_hs is None:
@@ -651,9 +661,21 @@ def do_job():
                     STATE_ATTACK_YELLOW: YELLOW,
                 }
                 if desired_battle_state in state_to_color:
-                    do_attack(state_to_color[desired_battle_state])
+                    color = state_to_color[desired_battle_state]
+                    do_attack(color)
+                    color_to_msg = {
+                        RED: u'В атаку на красных! За мноооой!!!',
+                        BLUE: u'Валим синих! Урааааа!!!',
+                        YELLOW: u'Не оставим от желтого замка камня на камне!!!',
+                        WHITE: u'DarthVader идет на белых! Вперееед!!!',
+                    }
+                    send_msg(color_to_msg[color])
+                    wait_any()                   
                 else:
                     do_defence()
+                    send_msg(u'DarthVader прикроет родной Мордор')
+                    wait_any()
+                cry_set = True
                 last_hs = None
 
         # time.sleep(1)
