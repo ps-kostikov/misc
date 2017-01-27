@@ -11,6 +11,7 @@ $(PKG): YCR_APPS += $(bin-name)
 $(bin-name): LIBS = \
 	yandex-maps-pgpool3 \
 	yandex-maps-json \
+	yandex-maps-tileutils5 \
 
 $(bin-name): SRCS := \
 	yacare.cpp \
