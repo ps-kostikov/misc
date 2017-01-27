@@ -9,6 +9,7 @@
 #include <chrono>
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 namespace mpgp = maps::pgpool3;
 namespace mj = maps::json;
@@ -69,6 +70,76 @@ std::string mercatorWkt(uint64_t x, uint64_t y, uint64_t z)
     return ss.str();
 }
 
+struct Feedback
+{
+    uint64_t id;
+    std::string comment;
+    double x;
+    double y;
+};
+
+typedef std::vector<Feedback> Feedbacks;
+
+struct Pin
+{
+    std::string id;
+    std::string balloonContent;
+    std::string clusterCaption;
+    std::string hintContent;
+    double x;
+    double y;
+};
+typedef std::vector<Pin> Pins;
+
+Pins convertToPins(const Feedbacks& feedbacks)
+{
+    Pins result;
+    for (const auto& feedback: feedbacks) {
+        Pin pin;
+        pin.id = std::to_string(feedback.id);
+        pin.balloonContent = feedback.comment;
+        pin.hintContent = feedback.comment;
+        pin.x = feedback.x;
+        pin.y = feedback.y;
+        result.push_back(pin);
+    }
+    return result;
+}
+
+Pins squashToPins(const Feedbacks& feedbacks)
+{
+    if (feedbacks.size() <= 1) {
+        return convertToPins(feedbacks);
+    }
+    Pin pin;
+
+    pin.id = "";
+    for (const auto& f: feedbacks) {
+        pin.id += "_";
+        pin.id += std::to_string(f.id);
+        if (pin.id.size() > 1000) {
+            break;
+        }
+    }
+
+    pin.balloonContent = std::to_string(feedbacks.size());
+    pin.hintContent = std::to_string(feedbacks.size());
+
+    pin.x = 0.;
+    for (const auto& f: feedbacks) {
+        pin.x += f.x;
+    }
+    pin.x /= feedbacks.size();
+
+    pin.y = 0.;
+    for (const auto& f: feedbacks) {
+        pin.y += f.y;
+    }
+    pin.y /= feedbacks.size();
+
+    return {pin};
+}
+
 // yacare::ThreadPool heavyPool(/* name = */ "heavy", /* threads  = */ 32, /* backlog = */ 16);
 // YCR_RESPOND_TO("sample:/signals-renderer", YCR_IN_POOL(heavyPool))
 
@@ -95,6 +166,19 @@ YCR_RESPOND_TO("sample:/tiles")
     auto postgresQueryEnd = std::chrono::system_clock::now();
     std::chrono::duration<double> postgresQueryDuration = postgresQueryEnd - postgresQueryBegin;
 
+    Feedbacks feedbacks;
+    for (const auto& row: result) {
+        Feedback feedback;
+        feedback.id = row["id"].as<uint64_t>();
+        feedback.comment = row["comment"].as<std::string>();
+        feedback.x = row["x"].as<double>();
+        feedback.y = row["y"].as<double>();
+        feedbacks.push_back(feedback);
+    }
+
+    auto pins = squashToPins(feedbacks);
+    // auto pins = convertToPins(feedbacks);
+
     // if (result.empty()) {
     //     std::cout << "postgres time " << postgresQueryDuration.count() << "sec" << std::endl;
     //     throw yacare::errors::NotFound() << "no db record";
@@ -109,24 +193,24 @@ YCR_RESPOND_TO("sample:/tiles")
 
 
     mj::Builder builder;
-    builder << [&result](mj::ObjectBuilder b) {
+    builder << [&pins](mj::ObjectBuilder b) {
         b["type"] = "FeatureCollection";
-        b["features"] = [&result](mj::ArrayBuilder b) {
-            for (const auto& row: result) {
-                b << [&row](mj::ObjectBuilder b) {
+        b["features"] = [&pins](mj::ArrayBuilder b) {
+            for (const auto& pin: pins) {
+                b << [&pin](mj::ObjectBuilder b) {
                     b["type"] = "Feature";
-                    b["id"] = row["id"].as<uint64_t>();
-                    b["geometry"] = [&row](mj::ObjectBuilder b) {
+                    b["id"] = pin.id;
+                    b["geometry"] = [&pin](mj::ObjectBuilder b) {
                         b["type"] = "Point";
-                        b["coordinates"] = [&row](mj::ArrayBuilder b) {
-                            b << row["y"].as<double>();
-                            b << row["x"].as<double>();
+                        b["coordinates"] = [&pin](mj::ArrayBuilder b) {
+                            b << pin.y;
+                            b << pin.x;
                         };
                     };
-                    b["properties"] = [&row](mj::ObjectBuilder b) {
-                        b["balloonContent"] = row["comment"].as<std::string>();
-                        b["clusterCaption"] = "lable 1";
-                        b["hintContent"] = row["comment"].as<std::string>();
+                    b["properties"] = [&pin](mj::ObjectBuilder b) {
+                        b["balloonContent"] = pin.balloonContent;
+                        b["clusterCaption"] = pin.clusterCaption;
+                        b["hintContent"] = pin.hintContent;
                     };
                 };
             }
