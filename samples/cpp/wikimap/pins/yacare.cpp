@@ -3,6 +3,9 @@
 #include <yandex/maps/json/builder.h>
 #include <yandex/maps/json/value.h>
 #include <yandex/maps/tileutils5/tile.h>
+#include <yandex/maps/tileutils5/tilerange.h>
+#include <yandex/maps/geolib3/point.h>
+#include <yandex/maps/geolib3/transform.h>
 
 #include <boost/optional.hpp>
 
@@ -14,6 +17,7 @@
 namespace mpgp = maps::pgpool3;
 namespace mj = maps::json;
 namespace mtu = maps::tileutils5;
+namespace mg = maps::geolib3;
 
 std::unique_ptr<mpgp::Pool> g_poolPtr;
 
@@ -148,6 +152,60 @@ Pin squashToPin(const Feedbacks& feedbacks)
     return pin;
 }
 
+mg::Point2 geoToMercator(const mg::Point2& geoPoint)
+{
+    return mg::GeodeticToMercatorTransform2()(geoPoint, mg::TransformDirection::Forward);
+}
+
+bool coveredBy(const Feedback& feedback, const mtu::Tile& tile)
+{
+    auto mPoint = geoToMercator(mg::Point2(feedback.x, feedback.y));
+    auto mBox = tile.mercatorBox();
+    return (mPoint.x() > mBox.lt().x() and mPoint.x() <= mBox.rb().x() and
+        mPoint.y() < mBox.lt().y() and mPoint.y() >= mBox.rb().y());
+}
+
+Pins clusterize(const Feedbacks& feedbacks, uint64_t x, uint64_t y, uint64_t z)
+{
+    // const int depth = 0;
+    std::vector<Feedbacks> clusters;
+
+    mtu::Tile baseTile(x, y, z);
+
+    mtu::TileRange tileRange(baseTile, baseTile.scale() + 2);
+    for (const mtu::Tile& tile: tileRange) {
+        Feedbacks cluster;
+        // std::cout << tile.x() << " " << tile.y() << " " << tile.scale() << std::endl;
+        for (const auto& feedback: feedbacks) {
+            if (coveredBy(feedback, tile)) {
+                cluster.push_back(feedback);
+            } else {
+                // std::cout << "AAAAAAAAAAAAAAAAAAAA" << std::endl;
+            }
+        }
+        if (!cluster.empty()) {
+            clusters.push_back(cluster);
+        }
+    }
+
+    size_t total = 0;
+    for (const auto& cluster: clusters) {
+        total += cluster.size();
+    }
+    if (total != feedbacks.size()) {
+        throw std::runtime_error("size mismatch");
+    }
+
+
+    Pins result;
+    for (const auto& cluster: clusters) {
+        if (!cluster.empty()) {
+            result.push_back(squashToPin(cluster));
+        }
+    }
+    return result;
+}
+
 
 // yacare::ThreadPool heavyPool(/* name = */ "heavy", /* threads  = */ 32, /* backlog = */ 16);
 // YCR_RESPOND_TO("sample:/signals-renderer", YCR_IN_POOL(heavyPool))
@@ -185,11 +243,12 @@ YCR_RESPOND_TO("sample:/tiles")
         feedbacks.push_back(feedback);
     }
 
-    Pins pins;
-    if (!feedbacks.empty()) {
-        pins.push_back(squashToPin(feedbacks));
-    }
-    // auto pins = convertToPins(feedbacks);
+    // Pins pins;
+    // if (!feedbacks.empty()) {
+    //     pins.push_back(squashToPin(feedbacks));
+    // }
+    auto pins = clusterize(feedbacks, *xOpt, *yOpt, *zOpt);
+
 
     // if (result.empty()) {
     //     std::cout << "postgres time " << postgresQueryDuration.count() << "sec" << std::endl;

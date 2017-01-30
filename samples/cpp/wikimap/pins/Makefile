@@ -12,6 +12,7 @@ $(bin-name): LIBS = \
 	yandex-maps-pgpool3 \
 	yandex-maps-json \
 	yandex-maps-tileutils5 \
+	yandex-maps-geolib3 \
 
 $(bin-name): SRCS := \
 	yacare.cpp \
