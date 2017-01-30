@@ -91,25 +91,33 @@ struct Pin
 };
 typedef std::vector<Pin> Pins;
 
+Pin convertToPin(const Feedback& feedback)
+{
+    Pin pin;
+    pin.id = std::to_string(feedback.id);
+    pin.balloonContent = feedback.comment;
+    pin.hintContent = feedback.comment;
+    pin.x = feedback.x;
+    pin.y = feedback.y;
+    return pin;
+}
+
 Pins convertToPins(const Feedbacks& feedbacks)
 {
     Pins result;
     for (const auto& feedback: feedbacks) {
-        Pin pin;
-        pin.id = std::to_string(feedback.id);
-        pin.balloonContent = feedback.comment;
-        pin.hintContent = feedback.comment;
-        pin.x = feedback.x;
-        pin.y = feedback.y;
-        result.push_back(pin);
+        result.push_back(convertToPin(feedback));
     }
     return result;
 }
 
-Pins squashToPins(const Feedbacks& feedbacks)
+Pin squashToPin(const Feedbacks& feedbacks)
 {
-    if (feedbacks.size() <= 1) {
-        return convertToPins(feedbacks);
+    if (feedbacks.empty()) {
+        throw std::runtime_error("empty feedback list");
+    }
+    if (feedbacks.size() == 1) {
+        return convertToPin(feedbacks.at(0));
     }
     Pin pin;
 
@@ -137,8 +145,9 @@ Pins squashToPins(const Feedbacks& feedbacks)
     }
     pin.y /= feedbacks.size();
 
-    return {pin};
+    return pin;
 }
+
 
 // yacare::ThreadPool heavyPool(/* name = */ "heavy", /* threads  = */ 32, /* backlog = */ 16);
 // YCR_RESPOND_TO("sample:/signals-renderer", YCR_IN_POOL(heavyPool))
@@ -176,7 +185,10 @@ YCR_RESPOND_TO("sample:/tiles")
         feedbacks.push_back(feedback);
     }
 
-    auto pins = squashToPins(feedbacks);
+    Pins pins;
+    if (!feedbacks.empty()) {
+        pins.push_back(squashToPin(feedbacks));
+    }
     // auto pins = convertToPins(feedbacks);
 
     // if (result.empty()) {
