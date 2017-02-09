@@ -644,7 +644,7 @@ def do_job():
         if ttb > datetime.timedelta(hours=3, minutes=55):
             last_hs = None
 
-        if ttb > datetime.timedelta(minutes=5) and ttb < datetime.timedelta(hours=3, minutes=55) and now.hour >= 7:
+        if ttb > datetime.timedelta(minutes=5) and ttb < datetime.timedelta(hours=3, minutes=55) and now.hour >= 6:
             msg = get_last_chat_wars_msg()
             if msg is not None:
                 if GO in msg.text:
@@ -675,7 +675,7 @@ def do_job():
             if last_hs is None:
                 continue
 
-            nice_hour = (8 <= now.hour < 10) or (20 <= now.hour < 22)
+            nice_hour = (8 <= now.hour < 10) or (16 <= now.hour < 18) or (21 <= now.hour < 23) or (0 <= now.hour < 2)
             if last_hs.stamina >= 10 or (nice_hour and last_hs.stamina > 0):
                 do_forest()
                 last_hs = None
