@@ -33,7 +33,7 @@ sender = None
 
 
 # checked
-FOREST = u"🌲Лес"
+FOREST_QUEST = u"🌲Лес"
 GO = u'/go'
 DEFENCE = u'🛡 Защита'
 DEFENCE_COMMAND = u'🛡'
@@ -69,14 +69,23 @@ DEFS = [
 ]
 HITS_DEFS = HITS + DEFS
 
+TAVERN = u'🍺Таверна'
+TAKE_ELL = u'🍺Взять кружку эля'
+
+
 # ------ not checked
 BLACK = u'🇬🇵'
 
 BACK = u'⬅️Назад'
 KOROVANY = u'🐫ГРАБИТЬ КОРОВАНЫ'
+CAVE_QUEST = u'🕸Пещера'
 
-TAVERN = u'🍺Таверна'
-TAKE_ELL = u'🍺Взять кружку эля'
+MOUNTAIN = u'⛰'
+MOUNTAIN_FORT = u'⛰Горный форт'
+FOREST_FORT = u'🌲Лесной форт'
+FOREST = u"🌲"
+
+ATTACK_SIGN = u'⚔'
 
 #---------------------------
 
@@ -86,7 +95,11 @@ STATE_ATTACK_BLUE = 'attack_blue'
 STATE_ATTACK_WHITE = 'attack_white'
 STATE_ATTACK_YELLOW = 'attack_yellow'
 STATE_ATTACK_BLACK = 'attack_black'
+STATE_ATTACK_FOREST_FORT = 'attack_forest_fort'
+STATE_ATTACK_MOUNTAIN_FORT = 'attack_mountain_fort'
 STATE_DEFENCE = 'defence'
+STATE_DEFENCE_FOREST_FORT = 'defence_forest_fort'
+STATE_DEFENCE_MOUNTAIN_FORT = 'defence_mountain_fort'
 STATE_FOREST = 'forest'
 STATE_TAVERN = 'tavern'
 STATE_KOROVANY = 'korovany'
@@ -245,16 +258,13 @@ def send_msg(text, peer=CHAT_WARS_PEER):
 
 
 def time_to_battle():
-    # looks like it works only because of Moscow = UTC+3 - exactly battle_gap
-    now = datetime.datetime.now()
-    battle_time = (
-        datetime.datetime.combine(
-            datetime.date.today(),
-            datetime.time.min
-        )
-        + datetime.timedelta(hours=1)
-    )
-    battle_gap = datetime.timedelta(hours=3)
+    now = datetime.datetime.now(TZ)
+    battle_time = now - datetime.timedelta(
+        hours=now.time().hour,
+        minutes=now.time().minute,
+        seconds=now.time().second,
+        microseconds=now.time().microsecond)
+    battle_gap = datetime.timedelta(hours=4)
     while battle_time < now:
         battle_time += battle_gap
     return battle_time - now
@@ -331,9 +341,26 @@ def parse_hero_status(text):
                 state = word_to_state[castle_word]
             continue
 
-        match = re.match(u'.*Защита\s+своего\s+замка.*', line)
-        if match is not None:
+        if u'Атака на' in line and u'Лесной форт' in line:
+            state = STATE_ATTACK_FOREST_FORT
+            continue
+
+        if u'Атака на' in line and u'Горный форт' in line:
+            state = STATE_ATTACK_MOUNTAIN_FORT
+            continue
+
+        # match = re.match(u'.*Защита\s+своего\s+замка.*', line)
+        # if match is not None:
+        if u'Защита' in line and u'Черного' in line:
             state = STATE_DEFENCE
+            continue
+
+        if u'Защита' in line and u'Лесного форта' in line:
+            state = STATE_DEFENCE_FOREST_FORT
+            continue
+
+        if u'Защита' in line and u'Горного форта' in line:
+            state = STATE_DEFENCE_MOUNTAIN_FORT
             continue
 
         match = re.match(u'.*В\s+лесу.*', line)
@@ -447,7 +474,7 @@ def wait_any_and_save(min_to_wait):
 def do_forest():
     send_msg(QUESTS)
     wait_any()
-    send_msg(FOREST)
+    send_msg(FOREST_QUEST)
     wait_forest_done()
 
 def do_attack(color):
@@ -456,8 +483,10 @@ def do_attack(color):
     send_msg(color)
     wait_any()
 
-def do_defence():
+def do_defence(target):
     send_msg(DEFENCE)
+    wait_any()
+    send_msg(target)
     wait_any()
 
 def do_go():
@@ -553,7 +582,8 @@ def do_job():
     # for color in (BLUE, RED, WHITE, YELLOW):
     #     do_attack(color)
 
-    # do_defence()
+    # do_defence(BLACK)
+    # return
 
     # send_msg(DEFENCE_COMMAND)
     # time.sleep(1)
@@ -575,79 +605,98 @@ def do_job():
 
     while True:
         msg = get_last_command_chat_msg()
+        key_to_state = {
+            BLUE: STATE_ATTACK_BLUE,
+            RED: STATE_ATTACK_RED,
+            YELLOW: STATE_ATTACK_YELLOW,
+            WHITE: STATE_ATTACK_WHITE,
+            DEFENCE_COMMAND: STATE_DEFENCE,
+            FOREST: STATE_ATTACK_FOREST_FORT,
+            MOUNTAIN: STATE_ATTACK_MOUNTAIN_FORT,
+        }
         if msg is not None:
-            if BLUE in msg.text:
-                desired_battle_state = STATE_ATTACK_BLUE
-            elif RED in msg.text:
-                desired_battle_state = STATE_ATTACK_RED
-            elif YELLOW in msg.text:
-                desired_battle_state = STATE_ATTACK_YELLOW
-            elif WHITE in msg.text:
-                desired_battle_state = STATE_ATTACK_WHITE
-            elif DEFENCE_COMMAND in msg.text or BLACK in msg.text:
-                desired_battle_state = STATE_DEFENCE
+            key_count = 0
+            for key in key_to_state.keys():
+                if key in msg.text:
+                    key_count += 1
+                if ATTACK_SIGN in msg.text:
+                    key_count += 1
+            if key_count == 1:
+                for key, state in key_to_state.iteritems():
+                    if key in msg.text:
+                        desired_battle_state = state
 
         ttb = time_to_battle()
         now = datetime.datetime.now(TZ)
 
-        if ttb > datetime.timedelta(minutes=15) and ttb < datetime.timedelta(hours=2, minutes=45) and cry_set:
-            if (now.hour >= 19 or now.hour < 7):
-                send_msg(u'Пойду напьюсь')
-            else:
-                send_msg(u'На арену что ли сходить')
-            wait_any()
-            cry_set = False
+        if ttb > datetime.timedelta(hours=3):
+            desired_battle_state = STATE_DEFENCE
 
-        if ttb > datetime.timedelta(minutes=5) and ttb < datetime.timedelta(hours=2, minutes=55):
+        # if ttb > datetime.timedelta(minutes=15) and ttb < datetime.timedelta(hours=2, minutes=45) and cry_set:
+        #     # if (now.hour >= 19 or now.hour < 7):
+        #     #     send_msg(u'Пойду напьюсь')
+        #     # else:
+        #     #     send_msg(u'На арену что ли сходить')
+        #     send_msg(u'Follow the dark side')
+        #     wait_any()
+        #     cry_set = False
+
+        if ttb > datetime.timedelta(hours=3, minutes=55):
+            last_hs = None
+
+        if ttb > datetime.timedelta(minutes=5) and ttb < datetime.timedelta(hours=3, minutes=55) and now.hour >= 7:
             msg = get_last_chat_wars_msg()
             if msg is not None:
                 if GO in msg.text:
                     do_go()
                     last_hs = None
 
-            if ttb > datetime.timedelta(minutes=15) and now.hour >= 6:
-                if last_arena_time is None or now - last_arena_time > datetime.timedelta(minutes=61):
+        #     # if ttb > datetime.timedelta(minutes=15) and now.hour >= 6:
+        #     if ttb > datetime.timedelta(minutes=15):
+        #         if last_arena_time is None or now - last_arena_time > datetime.timedelta(minutes=61):
 
-                    min_to_wait = 20
-                    if ttb < datetime.timedelta(minutes=35):
-                        min_to_wait = max(1, ttb.seconds / 60 - 15)
+        #             min_to_wait = 20
+        #             if ttb < datetime.timedelta(minutes=35):
+        #                 min_to_wait = max(1, ttb.seconds / 60 - 15)
 
-                    arena_result = do_arena(min_to_wait)
-                    if arena_result:
-                        last_arena_time = datetime.datetime.now(TZ)
-                    else:
-                        if last_arena_time is None:
-                            # FIXME eval precise last_arena_time from history
-                            last_arena_time = datetime.datetime.now(TZ) - datetime.timedelta(minutes=30)
-                    last_hs = None
-                    continue
+        #             arena_result = do_arena(min_to_wait)
+        #             if arena_result:
+        #                 last_arena_time = datetime.datetime.now(TZ)
+        #             else:
+        #                 if last_arena_time is None:
+        #                     # FIXME eval precise last_arena_time from history
+        #                     last_arena_time = datetime.datetime.now(TZ) - datetime.timedelta(minutes=30)
+        #             last_hs = None
+        #             continue
 
-            if ttb > datetime.timedelta(hours=1):
-                if last_hs is None:
-                    last_hs = get_hero_status()
-                if last_hs is None:
-                    continue
+        if ttb > datetime.timedelta(hours=1) and ttb < datetime.timedelta(hours=3, minutes=55):
+            if last_hs is None:
+                last_hs = get_hero_status()
+            if last_hs is None:
+                continue
 
-                if last_hs.stamina >= 3:
-                    do_forest()
-                    last_hs = None
-                    continue
+            nice_hour = (8 <= now.hour < 10) or (20 <= now.hour < 22)
+            if last_hs.stamina >= 10 or (nice_hour and last_hs.stamina > 0):
+                do_forest()
+                last_hs = None
+                continue
 
-            if ttb > datetime.timedelta(minutes=30) and (now.hour >= 19 or now.hour < 7):
-                if last_tavern_time is None or now - last_tavern_time > datetime.timedelta(minutes=3):
-                    if last_hs is None:
-                        last_hs = get_hero_status()
-                    if last_hs is None:
-                        continue
+            # if ttb > datetime.timedelta(minutes=30) and (now.hour >= 19 or now.hour < 7):
+            #     if last_tavern_time is None or now - last_tavern_time > datetime.timedelta(minutes=3):
+            #         if last_hs is None:
+            #             last_hs = get_hero_status()
+            #         if last_hs is None:
+            #             continue
 
-                    if last_hs.gold >= 100:
-                        last_tavern_time = datetime.datetime.now(TZ)
-                        do_tavern()
-                        last_hs = None
-                        continue
+            #         if last_hs.gold >= 100:
+            #             last_tavern_time = datetime.datetime.now(TZ)
+            #             do_tavern()
+            #             last_hs = None
+            #             continue
 
 
-        if ttb < datetime.timedelta(minutes=10):
+        default_order_time = (now.day * 11 + now.hour * 31) % 20 + 10
+        if ttb < datetime.timedelta(minutes=default_order_time):
             if last_hs is None:
                 last_hs = get_hero_status()
             if last_hs is None:
@@ -659,23 +708,25 @@ def do_job():
                     STATE_ATTACK_BLUE: BLUE,
                     STATE_ATTACK_WHITE: WHITE,
                     STATE_ATTACK_YELLOW: YELLOW,
+                    STATE_ATTACK_FOREST_FORT: FOREST_FORT,
+                    STATE_ATTACK_MOUNTAIN_FORT: MOUNTAIN_FORT,
                 }
                 if desired_battle_state in state_to_color:
                     color = state_to_color[desired_battle_state]
                     do_attack(color)
-                    color_to_msg = {
-                        RED: u'В атаку на красных! За мноооой!!!',
-                        BLUE: u'Валим синих! Урааааа!!!',
-                        YELLOW: u'Не оставим от желтого замка камня на камне!!!',
-                        WHITE: u'DarthVader идет на белых! Вперееед!!!',
-                    }
-                    send_msg(color_to_msg[color])
-                    wait_any()                   
+                    # color_to_msg = {
+                    #     RED: u'В атаку на красных! За мноооой!!!',
+                    #     BLUE: u'Валим синих! Урааааа!!!',
+                    #     YELLOW: u'Не оставим от желтого замка камня на камне!!!',
+                    #     WHITE: u'DarthVader идет на белых! Вперееед!!!',
+                    # }
+                    # send_msg(color_to_msg[color])
+                    # wait_any()                   
                 else:
-                    do_defence()
-                    send_msg(u'DarthVader прикроет родной Мордор')
-                    wait_any()
-                cry_set = True
+                    do_defence(BLACK)
+                    # send_msg(u'DarthVader прикроет родной Мордор')
+                    # wait_any()
+                # cry_set = True
                 last_hs = None
 
         # time.sleep(1)
