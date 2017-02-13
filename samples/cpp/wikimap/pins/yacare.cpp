@@ -226,8 +226,11 @@ YCR_RESPOND_TO("sample:/tiles")
 
     auto connection = g_poolPtr->getMasterConnection();
     auto transaction = mpgp::makeWriteableTransaction(std::move(connection));
+
+    // const std::string tableName = "pkostikov.pins_all";
+    const std::string tableName = "pkostikov.pins_from_startrack";
     std::stringstream query;
-    query << "select id, comment, st_x(position) as x, st_y(position) as y from pkostikov.pins_all ";
+    query << "select id, comment, st_x(position) as x, st_y(position) as y from " << tableName << " ";
     query << "where st_within(position, st_transform(st_setsrid(st_geomfromtext('" << mWkt<< "'), 3395), 4326))";
     auto postgresQueryBegin = std::chrono::system_clock::now();
     auto result = transaction->exec(query.str());
