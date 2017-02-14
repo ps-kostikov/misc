@@ -1,6 +1,9 @@
 from startrek_client import Startrek
 import pickle
 import re
+import random
+import copy
+import sys
 
 
 print 'hello'
@@ -58,7 +61,15 @@ class GeoTask(object):
         if self.link:
             res += '<p><a href="{0}">link</a></p>'.format(self.link.encode('utf-8'))
         res += '<p>{0}</p>'.format(self.description.encode('utf-8'))
-        return res.replace("'", "\\'")
+        # FIXME 1st replacement is correct
+        # return res.replace("'", "\\'")
+        return res.replace("'", "")
+
+    def make_random_copy(self):
+        res = copy.copy(self)
+        res.x = res.x + random.uniform(-2, 2)
+        res.y = res.y + random.uniform(-2, 2)
+        return res
 
 # {0}
 # link
@@ -121,6 +132,22 @@ def handle_issue(issue):
 #     pickle.dump(issues_list, f)
 # return 
 
+def batching(iterable, batch_size):
+    current = []
+    for i in iterable:
+        current.append(i)
+        if len(current) >= batch_size:
+            yield current
+            current = []
+    if current:
+        yield current
+
+# ll = [1, 2, 3, 4, 5, 6]
+# for lp in batching(ll, 2):
+#     print lp
+
+# sys.exit(0)
+
 
 with open('issues.dump', 'rb') as f:
     issues = pickle.load(f)
@@ -133,11 +160,22 @@ geo_tasks = [handle_issue(issue) for issue in issues]
 geo_tasks = filter(None, geo_tasks)
 
 
+gt_to_insert = []
+for gt in geo_tasks:
+    for _ in range(1):
+        gt_to_insert.append(gt.make_random_copy())
+
+
+
 with open('insert.sql', 'w') as f:
-    f.write('insert into pkostikov.pins_from_startrack (position, comment) values \n')
-    gt_to_insert =  geo_tasks
-    values = ["(st_setsrid(st_geomfromtext('POINT (" + str(gt.x) + " " + str(gt.y) + ")'), 4326), '" + gt.text + "')" for gt in gt_to_insert]
-    f.write(',\n'.join(values))
+    for gt_batch in batching(gt_to_insert, 1000):
+        # f.write('insert into pkostikov.pins_from_startrack (position, comment) values \n')
+        f.write('insert into pins (position, comment) values \n')
+        # f.write('insert into pins_100k (position, comment) values \n')
+        # f.write('insert into pins_1kk (position, comment) values \n')
+        values = ["(st_setsrid(st_geomfromtext('POINT (" + str(gt.x) + " " + str(gt.y) + ")'), 4326), '" + gt.text + "')" for gt in gt_batch]
+        f.write(',\n'.join(values))
+        f.write(';')
 
 print 'issues_count', len(issues)
 print 'counter', counter
