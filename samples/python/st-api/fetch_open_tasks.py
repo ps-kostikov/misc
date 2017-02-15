@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from startrek_client import Startrek
 import pickle
 import re
@@ -14,10 +16,29 @@ client = Startrek(useragent='', base_url='https://st-api.yandex-team.ru', token=
 counter = 0
 fields = set()
 
+mapscontent_names = [
+    u'Неверное название',
+    u'Неверное положение метки',
+    u'Удалить с карты',
+    u'Нет на карте',
+    u'Неправильный маршрут пешком',
+    u'Неправильное время маршрута',
+    u'Я знаю маршрут лучше',
+]
+
+
+def make_summary(issue):
+    # print issue.key
+    # if issue.queue.name != 'MAPSCONTENT':
+    if not issue.key.startswith('MAPSCONTENT'):
+        return issue.summary
+    return re.sub('\[\w+\]', '', issue.summary).strip()
+
 
 class GeoTask(object):
     def __init__(self, issue):
-        self.summary = issue.summary
+        self.summary = make_summary(issue)
+        # print self.summary
         self.created_at = issue.createdAt
         self.nmaps_link = ''
         self.permalink = ''
@@ -86,12 +107,18 @@ def geo_task_available(issue):
     for line in issue.description.split('\n'):
         if line.startswith('coords:'):
             return True
+    if issue.queue == 'MAPSCONTENT':
+        name = re.sub('\[\w+\]', '', issue.summary).strip()
+        if name not in mapscontent_names:
+            return False
+
     return False
 
 
 def handle_issue(issue):
     if not geo_task_available(issue):
         return
+
     global counter
     counter += 1
 
@@ -113,24 +140,50 @@ def handle_issue(issue):
     # print '=' * 100
 
 
-# queues = [
-#     'MAPSCONTENT',
-#     'WAYFINDING',
-#     'RASPDATA',
-# ]
+# for component in client.queues['MAPSCONTENT'].components:
+#     print component, component.name, component.id
+
+
+queues = {
+    'MAPSCONTENT': [
+        'belarus',
+        'kazahstan',
+        'Moscow',
+        'spb',
+        'SNG',
+        'Ukraina',
+        'russia',
+    ],
+    'MCU': [
+        'callcenter-maps',
+        'Ukraina',
+    ]
+}
+
 # issues_list = []
-# for queue in queues:
+
+# for queue, component_names in queues.iteritems():
+#     component_ids = map(str, [component.id
+#         for component in client.queues[queue].components
+#         if component.name in component_names
+#     ])
+
 #     issues = client.issues.find(
-#         filter={'queue': queue, 'resolution': 'empty()', 'created': {'from': '2016-02-09'}},
-#         per_page=100)
+#             filter={'queue': queue, 'created': {'from': '2016-01-01'}, 'components': component_ids},
+#             # filter={'queue': queue, 'updated': {'from': '2016-01-01'}, 'components': component_ids},
+#             per_page=100)
+#     print queue, len(issues)
+
 #     for index in range(1, issues.pages_count + 1):
 #         page = issues.get_page(index)
 #         for issue in page:
 #             issues_list.append(issue)
+# print len(issues_list)
+
 
 # with open('issues.dump', 'wb') as f:
 #     pickle.dump(issues_list, f)
-# return 
+# sys.exit(0)
 
 def batching(iterable, batch_size):
     current = []
@@ -153,6 +206,7 @@ with open('issues.dump', 'rb') as f:
     issues = pickle.load(f)
 
 
+
 # for issue in issues:
 #     handle_issue(issue)
 
@@ -160,17 +214,18 @@ geo_tasks = [handle_issue(issue) for issue in issues]
 geo_tasks = filter(None, geo_tasks)
 
 
-gt_to_insert = []
-for gt in geo_tasks:
-    for _ in range(1):
-        gt_to_insert.append(gt.make_random_copy())
+gt_to_insert = geo_tasks
+# gt_to_insert = []
+# for gt in geo_tasks:
+#     for _ in range(1):
+#         gt_to_insert.append(gt.make_random_copy())
 
 
 
 with open('insert.sql', 'w') as f:
     for gt_batch in batching(gt_to_insert, 1000):
-        # f.write('insert into pkostikov.pins_from_startrack (position, comment) values \n')
-        f.write('insert into pins (position, comment) values \n')
+        f.write('insert into pkostikov.pins_from_startrack (position, comment) values \n')
+        # f.write('insert into pins (position, comment) values \n')
         # f.write('insert into pins_100k (position, comment) values \n')
         # f.write('insert into pins_1kk (position, comment) values \n')
         values = ["(st_setsrid(st_geomfromtext('POINT (" + str(gt.x) + " " + str(gt.y) + ")'), 4326), '" + gt.text + "')" for gt in gt_batch]
