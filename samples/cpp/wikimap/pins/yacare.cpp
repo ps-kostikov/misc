@@ -29,6 +29,9 @@ public:
 
     virtual void put(mpgp::logging::Message&& msg) override
     {
+        if (msg.source == "pgppool3.pinger.ping_target145g.load.yandex.net:5432.84.201.161.145") {
+            return;
+        }
         std::cout << msg.source << " " << msg.message << std::endl;
     }
 
@@ -208,10 +211,9 @@ Pins clusterize(const Feedbacks& feedbacks, uint64_t x, uint64_t y, uint64_t z)
 }
 
 
-// yacare::ThreadPool heavyPool(/* name = */ "heavy", /* threads  = */ 32, /* backlog = */ 16);
-// YCR_RESPOND_TO("sample:/signals-renderer", YCR_IN_POOL(heavyPool))
+yacare::ThreadPool heavyPool(/* name = */ "heavy", /* threads  = */ 32, /* backlog = */ 1024);
 
-YCR_RESPOND_TO("sample:/tiles")
+YCR_RESPOND_TO("sample:/tiles", YCR_IN_POOL(heavyPool))
 {
     auto xOpt = getOptionalParam<uint64_t>(request, "x");
     auto yOpt = getOptionalParam<uint64_t>(request, "y");
@@ -219,6 +221,10 @@ YCR_RESPOND_TO("sample:/tiles")
     if (not xOpt or not yOpt or not zOpt) {
         throw yacare::errors::BadRequest();
     }
+    if (*zOpt <= 7) {
+        throw yacare::errors::BadRequest();
+    }
+
     auto callbackOpt = getOptionalParam<std::string>(request, "callback");
 
     auto mWkt = mercatorWkt(*xOpt, *yOpt, *zOpt);
@@ -228,7 +234,9 @@ YCR_RESPOND_TO("sample:/tiles")
     auto transaction = mpgp::makeWriteableTransaction(std::move(connection));
 
     // const std::string tableName = "pkostikov.pins_all";
-    const std::string tableName = "pkostikov.pins_from_startrack";
+    // const std::string tableName = "pkostikov.pins_from_startrack";
+    const std::string tableName = "pins_1kk";
+    // const std::string tableName = "pins";
     std::stringstream query;
     query << "select id, comment, st_x(position) as x, st_y(position) as y from " << tableName << " ";
     query << "where st_within(position, st_transform(st_setsrid(st_geomfromtext('" << mWkt<< "'), 3395), 4326))";
@@ -305,7 +313,8 @@ int main(int /*argc*/, const char** /*argv*/)
 
     mpgp::PoolConfigurationPtr poolConfiguration(mpgp::PoolConfiguration::create());
 
-    poolConfiguration->master = mpgp::InstanceId{"pg94.maps.dev.yandex.net", 5432};
+    // poolConfiguration->master = mpgp::InstanceId{"pg94.maps.dev.yandex.net", 5432};
+    poolConfiguration->master = mpgp::InstanceId{"target145g.load.yandex.net", 5432};
     mpgp::PoolConstantsPtr poolConstants(mpgp::PoolConstants::create(32, 32, 0, 0));
     poolConstants->getTimeoutMs = 5000;
     poolConstants->pingIntervalMs = 5000;
@@ -314,7 +323,8 @@ int main(int /*argc*/, const char** /*argv*/)
     g_poolPtr.reset(new mpgp::Pool(
         logger,
         std::move(poolConfiguration),
-        "dbname=mapspro_production user=mapspro password=mapspro",
+        // "dbname=mapspro_production user=mapspro password=mapspro",
+        "dbname=nk_tasks_experiment user=prototype password=prototype",
         std::move(poolConstants)
     ));
 

@@ -13,12 +13,25 @@ $(bin-name): LIBS = \
 	yandex-maps-json \
 	yandex-maps-tileutils5 \
 	yandex-maps-geolib3 \
+	yandex-maps-common \
+	yandex-maps-log8 \
 
 $(bin-name): SRCS := \
 	yacare.cpp \
 
-$(bin-name): INCLUDES += \
-	/usr/include/pqxx \
+
+
+DISTRIB := $(shell . /etc/lsb-release; echo $$DISTRIB_CODENAME)
+
+ifeq "$(DISTRIB)" "lucid"
+
+INCLUDES += /usr/include/pqxx
+$(bin-name): LIBS += pqxx
+else
+
+INCLUDES += /usr/include/yandex/maps/pqxx
+$(bin-name): LIBS += yandex-maps-pqxx
+endif
 
 CXX = g++-4.8
 CXXFLAGS += -std=c++0x
