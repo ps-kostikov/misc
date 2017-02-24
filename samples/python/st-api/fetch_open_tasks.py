@@ -6,6 +6,7 @@ import re
 import random
 import copy
 import sys
+import collections
 
 
 print 'hello'
@@ -14,7 +15,7 @@ client = Startrek(useragent='', base_url='https://st-api.yandex-team.ru', token=
 
 
 counter = 0
-fields = set()
+fields = collections.defaultdict(list)
 
 mapscontent_names = [
     u'Неверное название',
@@ -34,6 +35,14 @@ def make_summary(issue):
         return issue.summary
     return re.sub('\[\w+\]', '', issue.summary).strip()
 
+def need_add_to_description(line):
+    if 'Forwarded message' in line:
+        return False
+    if 'End of forwarded message' in line:
+        return False
+    if '<#' in line or '#>' in line:
+        return False
+    return True
 
 class GeoTask(object):
     def __init__(self, issue):
@@ -48,9 +57,11 @@ class GeoTask(object):
         for line in issue.description.split('\n'):
             match = re.match('(\w+):(.*)', line)
             if not match:
-                lines.append(line)
+                if need_add_to_description(line):
+                    lines.append(line)
                 continue
             field, rest = match.groups()
+            fields[field].append(issue.key)
             if field == 'coords':
                 self.x, self.y = map(float, rest.strip().split(','))
             elif field == 'nmaps_link':
@@ -234,8 +245,44 @@ with open('insert.sql', 'w') as f:
 
 print 'issues_count', len(issues)
 print 'counter', counter
-# for field in fields:
-#     print field
+
+
+known_fields = [
+    'coords',
+    'nmaps_link',
+    'permalink',
+    'link',
+]
+
+suspicious_fileds = [
+    'email',
+    'name',
+    'browser',
+    'ip',
+    'region',
+    'testBuckets',
+    'yandexuid',
+    'uid',
+    'mailto',
+    'From',
+    'To',
+    'Subject',
+    'Date',
+    'Sent',
+    'https',
+    'http',
+    'status',
+    'address',
+    'wrong_coords',
+    'correct_coords',
+    'upd',
+    'categories',
+    'PS',
+]
+print 'fields:'
+for field, keys in fields.iteritems():
+    if field not in known_fields and field not in suspicious_fileds:
+        print field, keys
 
 
 
