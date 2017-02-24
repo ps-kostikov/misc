@@ -714,6 +714,12 @@ def do_job():
                 if desired_battle_state in state_to_color:
                     color = state_to_color[desired_battle_state]
                     do_attack(color)
+
+                    send_msg('/on_106') # эльф меч
+                    time.sleep(1)
+                    send_msg('/on_150') # кинжал
+                    time.sleep(1)
+
                     # color_to_msg = {
                     #     RED: u'В атаку на красных! За мноооой!!!',
                     #     BLUE: u'Валим синих! Урааааа!!!',
@@ -724,6 +730,10 @@ def do_job():
                     # wait_any()                   
                 else:
                     do_defence(BLACK)
+                    send_msg('/on_123') # эльф копье
+                    time.sleep(1)
+                    send_msg('/on_127') # мифр щит
+                    time.sleep(1)
                     # send_msg(u'DarthVader прикроет родной Мордор')
                     # wait_any()
                 # cry_set = True
