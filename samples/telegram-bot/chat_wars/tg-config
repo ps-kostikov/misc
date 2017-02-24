@@ -1,0 +1,16 @@
+# This is an empty config file
+# Feel free to put something here
+
+default_profile = "darthvader";
+
+darthvader = {
+config_directory = ".telegram-cli/darthvader";
+};
+
+pushkin = {
+config_directory = ".telegram-cli/pushkin";
+};
+
+makedonskiy = {
+config_directory = ".telegram-cli/makedonskiy";
+};
