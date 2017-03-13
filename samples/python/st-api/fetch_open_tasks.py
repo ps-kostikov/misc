@@ -28,6 +28,16 @@ mapscontent_names = [
 ]
 
 
+name_to_type = {
+    u'Неверное название': 'wrong-name',
+    u'Неверное положение метки': 'wrong-position',
+    u'Удалить с карты': 'remove',
+    u'Нет на карте': 'absent-object',
+    u'Неправильный маршрут пешком': 'wrong-pedestrian-route',
+    u'Неправильное время маршрута': 'wrong-route-time',
+    u'Я знаю маршрут лучше': 'imperfect-route',
+}
+
 def make_summary(issue):
     # print issue.key
     # if issue.queue.name != 'MAPSCONTENT':
@@ -113,15 +123,18 @@ class GeoTask(object):
 def geo_task_available(issue):
     if not hasattr(issue, 'description'):
         return False
+
     if issue.description is None:
         return False
+
+    if issue.queue.key == 'MAPSCONTENT':
+        name = re.sub('\[\w+\]\s*', '', issue.summary).strip()
+        if name not in mapscontent_names:
+            return False
+
     for line in issue.description.split('\n'):
         if line.startswith('coords:'):
             return True
-    if issue.queue == 'MAPSCONTENT':
-        name = re.sub('\[\w+\]', '', issue.summary).strip()
-        if name not in mapscontent_names:
-            return False
 
     return False
 
@@ -217,6 +230,16 @@ with open('issues.dump', 'rb') as f:
     issues = pickle.load(f)
 
 
+# with open('issues_small.dump', 'wb') as f:
+#     small_issues = issues[:1000]
+#     pickle.dump(small_issues, f)
+
+# sys.exit(0) 
+
+# with open('issues_small.dump', 'rb') as f:
+#     issues = pickle.load(f)
+
+
 
 # for issue in issues:
 #     handle_issue(issue)
@@ -234,55 +257,77 @@ gt_to_insert = geo_tasks
 
 
 with open('insert.sql', 'w') as f:
-    for gt_batch in batching(gt_to_insert, 1000):
-        f.write('insert into pkostikov.pins_from_startrack (position, comment) values \n')
+    for gt_batch in batching(gt_to_insert, 1):
+        # f.write('insert into pkostikov.pins_from_startrack (position, comment) values \n')
+        f.write('insert into social.feedback_task (position, type, description, attrs) values \n')
         # f.write('insert into pins (position, comment) values \n')
         # f.write('insert into pins_100k (position, comment) values \n')
         # f.write('insert into pins_1kk (position, comment) values \n')
-        values = ["(st_setsrid(st_geomfromtext('POINT (" + str(gt.x) + " " + str(gt.y) + ")'), 4326), '" + gt.text + "')" for gt in gt_batch]
+
+        def position_str(gt):
+            return "st_transform(st_setsrid(st_geomfromtext('POINT (" + str(gt.x) + " " + str(gt.y) + ")'), 4326), 3395)"
+
+        def type_str(gt):
+            return "'" + name_to_type[gt.summary] + "'"
+
+        def description_str(gt):
+            return "'" + gt.description.replace("'", "").encode('utf-8') + "'"
+
+        def attrs_str(gt):
+            res = ''
+            parts = []
+            if gt.nmaps_link:
+                parts.append('"nmaps_link": "{0}"'.format(gt.nmaps_link))
+            if gt.permalink:
+                parts.append('"permalink": "{0}"'.format(gt.permalink))
+            if gt.link:
+                parts.append('"link": "{0}"'.format(gt.link))
+            return "'{" + ",".join(parts).replace("'", "") + "}'::json"
+
+        values = ["(" + ",".join([position_str(gt), type_str(gt), description_str(gt), attrs_str(gt)]) + ")" for gt in gt_batch]
         f.write(',\n'.join(values))
         f.write(';')
 
-print 'issues_count', len(issues)
-print 'counter', counter
+# print 'issues_count', len(issues)
+# print 'counter', counter
 
 
-known_fields = [
-    'coords',
-    'nmaps_link',
-    'permalink',
-    'link',
-]
+# known_fields = [
+#     'coords',
+#     'nmaps_link',
+#     'permalink',
+#     'link',
+# ]
 
-suspicious_fileds = [
-    'email',
-    'name',
-    'browser',
-    'ip',
-    'region',
-    'testBuckets',
-    'yandexuid',
-    'uid',
-    'mailto',
-    'From',
-    'To',
-    'Subject',
-    'Date',
-    'Sent',
-    'https',
-    'http',
-    'status',
-    'address',
-    'wrong_coords',
-    'correct_coords',
-    'upd',
-    'categories',
-    'PS',
-]
-print 'fields:'
-for field, keys in fields.iteritems():
-    if field not in known_fields and field not in suspicious_fileds:
-        print field, keys
+# suspicious_fileds = [
+#     'email',
+#     'name',
+#     'browser',
+#     'ip',
+#     'region',
+#     'testBuckets',
+#     'yandexuid',
+#     'uid',
+#     'mailto',
+#     'From',
+#     'To',
+#     'Subject',
+#     'Date',
+#     'Sent',
+#     'https',
+#     'http',
+#     'status',
+#     'address',
+#     'wrong_coords',
+#     'correct_coords',
+#     'upd',
+#     'categories',
+#     'PS',
+# ]
+# print 'fields:'
+# for field, keys in fields.iteritems():
+#     if field not in known_fields and field not in suspicious_fileds:
+#         print field, keys
 
 
 
