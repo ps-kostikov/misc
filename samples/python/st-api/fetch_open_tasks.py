@@ -88,6 +88,7 @@ class GeoTask(object):
             print '=' * 100
         # print self.x, self.y
         self.st_link = 'https://st.yandex-team.ru/' + issue.key
+        self.st_key = issue.key
         self.description = '\n'.join(lines)
 
     @property
@@ -258,11 +259,6 @@ gt_to_insert = geo_tasks
 
 with open('insert.sql', 'w') as f:
     for gt_batch in batching(gt_to_insert, 1):
-        # f.write('insert into pkostikov.pins_from_startrack (position, comment) values \n')
-        f.write('insert into social.feedback_task (position, type, description, attrs) values \n')
-        # f.write('insert into pins (position, comment) values \n')
-        # f.write('insert into pins_100k (position, comment) values \n')
-        # f.write('insert into pins_1kk (position, comment) values \n')
 
         def position_str(gt):
             return "st_transform(st_setsrid(st_geomfromtext('POINT (" + str(gt.x) + " " + str(gt.y) + ")'), 4326), 3395)"
@@ -285,8 +281,22 @@ with open('insert.sql', 'w') as f:
             return "'{" + ",".join(parts).replace("'", "") + "}'::json"
 
         values = ["(" + ",".join([position_str(gt), type_str(gt), description_str(gt), attrs_str(gt)]) + ")" for gt in gt_batch]
-        f.write(',\n'.join(values))
-        f.write(';')
+
+        # query = 'insert into pkostikov.pins_from_startrack (position, comment) values \n'
+        # query = 'insert into social.feedback_task (position, type, description, attrs) values \n'
+        # query = 'insert into pins (position, comment) values \n'
+        # query = 'insert into pins_100k (position, comment) values \n'
+        # query = 'insert into pins_1kk (position, comment) values \n'
+
+        query = 'with ft_ins as (insert into social.feedback_task (position, type, description, attrs) values \n'
+        query += ',\n'.join(values)
+        query += " returning id as feedback_task_id)"
+        query += " insert into social.star_trek_issue (key, feedback_task_id) \n"
+        query += " select '{0}', feedback_task_id from ft_ins".format(gt.st_key)
+
+        query += ';\n'
+
+        f.write(query)
 
 # print 'issues_count', len(issues)
 # print 'counter', counter
