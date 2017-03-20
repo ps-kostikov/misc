@@ -282,7 +282,7 @@ def parse_hero_status(text):
             gold = int(match.groups()[0])
             continue
 
-        match = re.match(u'.*Выносливость:\s+(\d+)\s+из\s+([\d\+]+).*', line)
+        match = re.match(u'.*Выносливость:\s+(\d+)\s*/\s*(\d+).*', line)
         if match is not None:
             stamina = int(match.groups()[0])
             stamina_max = sum(split_stat(match.groups()[1]))
@@ -354,13 +354,13 @@ def parse_hero_status(text):
     if state is None:
         state = STATE_UNKNOWN
 
-    if None in (team, gold, stamina, stamina_max, state):
+    if None in (team, stamina, stamina_max, state):
         logger.warn("Can not parse hero text")
         return None
 
     return HeroStatus(
         team=team,
-        gold=gold,
+        gold=0,
         stamina=stamina,
         stamina_max=stamina_max,
         state=state)
@@ -597,8 +597,8 @@ def main():
 
     tg = Telegram(
         port=tg_cli_port,
-        telegram="/home/pkostikov/tmp/tg/bin/telegram-cli",
-        pubkey_file="/home/pkostikov/tmp/tg/tg-server.pub",
+        telegram="/root/tg/bin/telegram-cli",
+        pubkey_file="/root/tg/tg-server.pub",
         custom_cli_args=custom_cli_args)
 
     thread = threading.Thread(target=lambda: run_receiver(tg))

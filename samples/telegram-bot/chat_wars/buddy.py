@@ -321,7 +321,7 @@ def parse_hero_status(text):
             gold = int(match.groups()[0])
             continue
 
-        match = re.match(u'.*Выносливость:\s+(\d+)\s+из\s+([\d\+]+).*', line)
+        match = re.match(u'.*Выносливость:\s+(\d+)\s*/\s*(\d+).*', line)
         if match is not None:
             stamina = int(match.groups()[0])
             stamina_max = sum(split_stat(match.groups()[1]))
@@ -393,13 +393,13 @@ def parse_hero_status(text):
     if state is None:
         state = STATE_UNKNOWN
 
-    if None in (team, gold, stamina, stamina_max, state):
+    if None in (team, stamina, stamina_max, state):
         logger.warn("Can not parse hero text")
         return None
 
     return HeroStatus(
         team=team,
-        gold=gold,
+        gold=0,
         stamina=stamina,
         stamina_max=stamina_max,
         state=state)
@@ -715,9 +715,9 @@ def do_job():
                     color = state_to_color[desired_battle_state]
                     do_attack(color)
 
-                    send_msg('/on_106') # эльф меч
+                    send_msg('/on_105') # эльф меч
                     time.sleep(1)
-                    send_msg('/on_150') # кинжал
+                    send_msg('/on_114') # кинжал
                     time.sleep(1)
 
                     # color_to_msg = {
@@ -730,9 +730,9 @@ def do_job():
                     # wait_any()                   
                 else:
                     do_defence(BLACK)
-                    send_msg('/on_123') # эльф копье
+                    send_msg('/on_110') # эльф копье
                     time.sleep(1)
-                    send_msg('/on_127') # мифр щит
+                    send_msg('/on_216') # мифр щит
                     time.sleep(1)
                     # send_msg(u'DarthVader прикроет родной Мордор')
                     # wait_any()
