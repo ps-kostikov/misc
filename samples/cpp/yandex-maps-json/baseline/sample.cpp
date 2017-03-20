@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 
 namespace mj = maps::json;
@@ -25,5 +27,10 @@ int main()
 	for (mj::Value v : val["array"]) {
 		std::cout << v.as<std::string>() << std::endl;
 	}
+
+	auto set = val["array"].as<std::unordered_set<std::string>>();
+        for (const auto& el: set) {
+                std::cout << el << std::endl;
+        }
 	return 0;
 }
