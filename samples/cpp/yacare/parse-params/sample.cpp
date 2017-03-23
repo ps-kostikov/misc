@@ -24,34 +24,64 @@ getOptionalParam(const yacare::Request& r, const std::string& name)
     }
 }
 
-
-YCR_QUERY_PARAM(c_name, std::string);
-YCR_QUERY_PARAM(c_id, uint64_t);
-
-YCR_RESPOND_TO("sample:/company", c_name)
+template <class T>
+T
+getParam(const yacare::Request& r, const std::string& name)
 {
-    auto c_opt = getOptionalParam<uint64_t>(request, "c_opt");
-    mj::Builder builder;
-    builder << [&](mj::ObjectBuilder builder) {
-        if (c_opt) {
-            builder["c_opt"] = *c_opt;
-        }
-        builder["c_name"] = c_name;
-    };
-    response << builder.str();
-    response["Content-Type"] = "application/json";
+    auto value = getOptionalParam<T>(r, name);
+    if (!value) {
+        throw yacare::errors::BadRequest() << " Missing parameter: " << name;
+    }
+    return *value;
 }
 
-YCR_RESPOND_TO("sample:/vendor/$/info")
-{
-    std::string vendor = argv[0];
 
-    mj::Builder builder;
-    builder << [&](mj::ObjectBuilder builder) {
-        builder["vendor"] = vendor;
-    };
-    response << builder.str();
-    response["Content-Type"] = "application/json";
+// YCR_QUERY_PARAM(c_name, std::string);
+// YCR_QUERY_PARAM(c_id, uint64_t);
+
+// YCR_RESPOND_TO("sample:/company", c_name)
+// {
+//     auto c_opt = getOptionalParam<uint64_t>(request, "c_opt");
+//     mj::Builder builder;
+//     builder << [&](mj::ObjectBuilder builder) {
+//         if (c_opt) {
+//             builder["c_opt"] = *c_opt;
+//         }
+//         builder["c_name"] = c_name;
+//     };
+//     response << builder.str();
+//     response["Content-Type"] = "application/json";
+// }
+
+// YCR_RESPOND_TO("sample:/vendor/$/info")
+// {
+//     std::string vendor = argv[0];
+
+//     mj::Builder builder;
+//     builder << [&](mj::ObjectBuilder builder) {
+//         builder["vendor"] = vendor;
+//     };
+//     response << builder.str();
+//     response["Content-Type"] = "application/json";
+// }
+
+
+YCR_QUERY_CUSTOM_PARAM((), taskId, boost::optional<int>)
+{
+    dest = getOptionalParam<int>(request, "task-id");
+    return true;
+}
+
+
+YCR_RESPOND_TO("sample:/handler", taskId)
+{
+    // response << taskId;
+    // auto taskId = getOptionalParam<int>(request, "task-id");
+    if (taskId) {
+        response << *taskId;
+    } else {
+        response << "no task-id";
+    }
 }
 
 

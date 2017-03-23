@@ -12,7 +12,9 @@ $(bin-name): SRCS := \
     sample.cpp \
 
 sample: LIBS = \
-	yandex-maps-json
+	yandex-maps-json \
+	yandex-maps-log8 \
+	yandex-maps-common \
 
 CXX = g++-4.8
 CXXFLAGS += -std=c++0x
