@@ -46,3 +46,5 @@ if [ -f /etc/debian_version ]; then
 fi
 
 # vim: set filetype=sh :
+
+alias yahg='ya tool hg'
