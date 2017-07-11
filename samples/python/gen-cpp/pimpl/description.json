@@ -1,0 +1,74 @@
+{
+    "name": "Task",
+    "properties": [
+        {
+            "name": "id",
+            "type": "std::string",
+            "isComplex": true,
+            "setter": "_default"
+        },
+        {
+            "name": "status",
+            "type": "TaskStatus",
+            "isComplex": false,
+            "setter": "_default"
+        },
+        {
+            "name": "service",
+            "type": "Service",
+            "isComplex": false,
+            "setter": "_default"
+        },
+        {
+            "name": "serviceObjectId",
+            "type": "std::string",
+            "isComplex": true,
+            "setter": "_default"
+        },
+        {
+            "name": "serviceObjectUrl",
+            "type": "std::string",
+            "isComplex": true,
+            "setter": "_default"
+        },
+        {
+            "name": "createdAt",
+            "type": "common::TimePoint",
+            "isComplex": false,
+            "setter": "_default"
+        },
+        {
+            "name": "updatedAt",
+            "type": "common::TimePoint",
+            "isComplex": false,
+            "setter": "_default"
+        },
+        {
+            "name": "externalRequests",
+            "type": "std::vector<TaskExternalRequest>",
+            "isComplex": true,
+            "setter": "_default"
+        },
+        {
+            "name": "attachedPhotos",
+            "type": "std::vector<std::string>",
+            "isComplex": true,
+            "setter": "_default"
+        },
+        {
+            "name": "originalTask",
+            "type": "OriginalTask",
+            "isComplex": true,
+            "setter": "_default"
+        },
+        {
+            "name": "comments",
+            "type": "std::vector<Comment>",
+            "isComplex": true,
+            "setter": "_default"
+        }
+    ]
+}
+
+
+
