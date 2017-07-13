@@ -1,0 +1,20 @@
+{
+    "name": "Configuration",
+    "properties": [
+        {
+            "name": "baseUrl",
+            "type": "std::string",
+            "isComplex": true,
+            "setter": "_default"
+        },
+        {
+            "name": "timeout",
+            "type": "std::chrono::milliseconds",
+            "isComplex": false,
+            "setter": "_default"
+        }
+    ]
+}
+
+
+

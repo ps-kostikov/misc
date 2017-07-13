@@ -35,9 +35,11 @@ public:
     {%- else %}
     {{ property.type }} {{ property.name }}() const;
     {%- endif %}
+    {%- if property.setter %}
+    {{ cls.name }}& {{ property.setter }}({{ property.type }} {{ property.name }});
+    {% endif %}
 
 {%- endfor %}
-
     COPYABLE_PIMPL_DECLARATIONS({{ cls.name }})
 };
 
@@ -65,6 +67,19 @@ const {{ property.type }}&
 {{ cls.name }}::{{ property.name }}() const
 {
     return impl_->{{ property.name }};
+}
+    {%- endif %}
+    {%- if property.setter %}
+
+{{ cls.name }}&
+{{ cls.name }}::{{ property.setter }}({{ property.type }} {{ property.name }})
+{
+        {%- if property.is_complex %}
+    impl_->{{ property.name }} = std::move({{ property.name }});
+        {%- else %}
+    impl_->{{ property.name }} = {{ property.name }};
+        {%- endif %}
+    return *this;
 }
     {%- endif %}
 
