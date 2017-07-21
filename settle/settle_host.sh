@@ -14,7 +14,7 @@ tar cf - -C ~/Work/ misc/ | ssh $username@$host tar xf -
 
 # todo: add sublime configs
 
-for file in bash_aliases bashrc git-completion gitconfig screenrc
+for file in bash_aliases bashrc git-completion gitconfig screenrc vimrc
 do ssh $username@$host "rm -rf /home/$username/.$file && ln -s /home/$username/misc/dotfiles/$file /home/$username/.$file"
 done
 
