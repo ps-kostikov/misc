@@ -1,8 +1,0 @@
-deb http://common.dist.yandex.ru/common stable/all/
-deb http://common.dist.yandex.ru/common stable/amd64/
-deb-src http://common.dist.yandex.ru/common stable/source/
-
-deb http://yandex-trusty.dist.yandex.ru/yandex-trusty stable/all/
-deb http://yandex-trusty.dist.yandex.ru/yandex-trusty stable/amd64/
-deb-src http://yandex-trusty.dist.yandex.ru/yandex-trusty stable/source/
-
