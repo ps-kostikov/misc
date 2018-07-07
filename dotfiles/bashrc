@@ -147,9 +147,20 @@ fi
 export DEBFULLNAME="Pavel Kostikov"
 export DEBEMAIL=pkostikov@yandex-team.ru
 
+
+
+# for ssh-agent in screen
+if [[ -S "$SSH_AUTH_SOCK" && ! -h "$SSH_AUTH_SOCK" ]]; then
+    ln -sf "$SSH_AUTH_SOCK" "/tmp/ssh-agent-$USER-screen";
+fi
+export SSH_AUTH_SOCK="/tmp/ssh-agent-$USER-screen"
+
+
+# for ssh-agent
 if [ -z "$SSH_AUTH_SOCK" ] ; then
   eval `ssh-agent -s`
   ssh-add
 fi
+
 
 PATH=$PATH:~/arcadia

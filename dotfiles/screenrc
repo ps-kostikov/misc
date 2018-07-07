@@ -12,3 +12,6 @@ termcapinfo xterm 'Co#256:AB=\E[48;5;%dm:AF=\E[38;5;%dm'
 # erase background with current bg color
 defbce "on" 
 defscrollback 100000
+
+# for ssh-agent in screen
+setenv SSH_AUTH_SOCK "/tmp/ssh-agent-$USER-screen"

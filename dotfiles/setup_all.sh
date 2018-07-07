@@ -4,7 +4,7 @@
 if [ -z "$1" ]
 then
     echo 'Configuring localhost ...'
-    for file in bash_aliases bashrc gitconfig screenrc vimrc
+    for file in bash_aliases bash_logout bashrc gitconfig screenrc vimrc
     do
         echo "Processing $file ..."
         rm -f ~/.$file
@@ -17,7 +17,7 @@ then
 else
     host=$1
     echo "Configuring $host ..."
-    for file in bash_aliases bashrc gitconfig screenrc vimrc
+    for file in bash_aliases bash_logout bashrc gitconfig screenrc vimrc
     do
         echo "Processing $file ..."
         ssh $host "rm -rf ~/.$file"
