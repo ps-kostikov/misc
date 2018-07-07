@@ -1,0 +1,5 @@
+Host *
+    CompressionLevel 9
+    Compression yes
+    ForwardAgent yes
+
