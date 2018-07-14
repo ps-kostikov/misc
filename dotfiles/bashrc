@@ -164,3 +164,6 @@ fi
 
 
 PATH=$PATH:~/arcadia
+
+alias yahg='ya tool hg'
+
