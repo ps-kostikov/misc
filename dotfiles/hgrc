@@ -1,3 +1,81 @@
 [ui]
 username = Pavel Kostikov <pkostikov@yandex-team.ru>
 editor = vim
+
+[pager]
+pager   = LESS='FRX' less
+attend-lg = true
+attend-wip = true
+attend-lgb = true
+attend-lgbt= true
+attend-dd  = true
+attend-dig = true
+attend-db  = true
+
+[templates]
+# https://www.mercurial-scm.org/repo/hg/help/templates
+# http://stackoverflow.com/a/16217915/1266605
+my_glog  = '{label("changeset.{phase}", node|short)} ({label('log.datedate',date|localdate|isodate)}) [{label('log.branch',branch)}] by {label("grep.user",author)}\n{desc|firstline}\n\n'
+branches = '{label("changeset.{phase}", node|short)}\t{date|localdate|isodate}\t{label(ifcontains(rev, revset('parents()'), 'log.activebranch', 'log.branch'),branch)}\n'
+
+[alias]
+lg      = glog -T my_glog
+lgb     = lg -b.
+lgbt    = lg -b. -b default
+b       = branch
+br      = !$HG upd && $HG branch users/$USER/$1
+# https://www.mercurial-scm.org/repo/hg/help/revsets
+brs     = log -r "head() and branch('re:$USER|^default$') and not closed() and not parents(merge())" -T branches
+rb      = !$HG branch | egrep "^users/$USER/local/" && { echo "You want to create a branch before opening a review."; exit 1; }; $HG pull && $HG rebase --keepbranches -d default && $HG push --new-branch -b . && $HG pull-request --open --require REVIEW && $HG log -vb.
+rb2     = !$HG pull-request --open --require REVIEW && $HG log -vb.
+pr      = pull-request
+rd      = rebase --keepbranches -d default
+upd     = !$HG pull && $HG up default
+md      = !$HG merge default && $HG ci -m 'hg merge default' && echo 'Merge committed successfully'
++1      = push -b.
+dd      = diff -r default:.
+db      = diff -r "ancestor(default, .)" -r .
+am      = ci --amend
+apply   = patch
+dig     = diff -gc
+
+[defaults]
+# log = -f  # follow-renames. Тормозит, зато показывает историю перемещённых файлов.
+
+[extensions]
+pager =
+color =
+progress =
+strip =
+graphlog =
+shelve =
+rebase =
+
+# http://jordi.inversethought.com/blog/customising-mercurial-like-a-pro/
+[revsetalias]
+wip = (parents(not public()) or not public() or . or head()) and (not obsolete() or unstable()^) and not closed()
+
+[templates]
+wip = '{date|localdate|isodate} [{node|short}] {label("log.branch", ifeq(branch, "default", "", branch))} {label("changeset.{phase}", rev)} {label("grep.user", author|user)}{label("log.tag", if(tags," {tags}"))} {bookmarks % "{ifeq(bookmark, currentbookmark, label('log.activebookmark', bookmark), label('log.bookmark', bookmark))} "}\n{label(ifcontains(rev, revset('parents()'), 'desc.here'),desc|firstline)}'
+
+[color]
+mode=auto
+
+#Colours for each label
+#log.branch=cyan bold
+log.branch=white
+log.summary=yellow
+log.description=yellow
+log.bookmark=green
+log.tag=cyan
+log.activebookmark = green bold underline
+log.activebranch   = white bold
+
+changeset.public=green bold
+changeset.secret=blue bold
+changeset.draft=yellow bold
+
+desc.here=bold blue_background
+
+[alias]
+wip = log --graph --rev=wip --template=wip
