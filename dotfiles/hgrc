@@ -50,6 +50,7 @@ strip =
 graphlog =
 shelve =
 rebase =
+histedit =
 
 # http://jordi.inversethought.com/blog/customising-mercurial-like-a-pro/
 [revsetalias]
